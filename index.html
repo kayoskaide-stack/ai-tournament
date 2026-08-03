@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>AI Tournament</title>
+  <style>
+    :root{
+      --bg:#070b16;--panel:#11182b;--panel2:#171f36;--text:#f6f7fb;--muted:#aeb7cc;
+      --line:#2a3555;--gold:#ffd166;--green:#65e6a7;--red:#ff6b7a;--blue:#69a7ff;
+      --purple:#b58cff;--cyan:#63e6ff;--shadow:0 18px 50px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--text);background:
+      radial-gradient(circle at 20% 0%,rgba(105,167,255,.18),transparent 28%),
+      radial-gradient(circle at 100% 20%,rgba(181,140,255,.14),transparent 25%),
+      linear-gradient(180deg,#0a1020,#060914 70%);
+      min-height:100vh;
+    }
+    button,input,textarea{font:inherit}
+    .wrap{max-width:1180px;margin:auto;padding:22px 16px 56px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px}
+    .brand{display:flex;gap:13px;align-items:center}
+    .trophy{
+      width:52px;height:52px;border-radius:17px;display:grid;place-items:center;font-size:27px;
+      background:linear-gradient(145deg,#ffd166,#ff9f43);box-shadow:0 12px 32px rgba(255,177,66,.22)
+    }
+    h1{font-size:clamp(28px,5vw,48px);line-height:1;margin:0}
+    .subtitle{color:var(--muted);margin-top:6px;font-size:14px}
+    .status{padding:9px 12px;border:1px solid rgba(101,230,167,.34);background:rgba(101,230,167,.08);
+      border-radius:999px;color:var(--green);font-size:13px;font-weight:700;white-space:nowrap}
+    .grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
+    .card{background:linear-gradient(180deg,rgba(23,31,54,.95),rgba(15,22,39,.95));
+      border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+    .challenge{padding:18px}
+    .card h2{margin:0 0 12px;font-size:18px}
+    label{display:block;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
+    textarea,input{
+      width:100%;border:1px solid var(--line);border-radius:14px;background:#0b1120;color:var(--text);
+      padding:13px 14px;outline:none
+    }
+    textarea{min-height:92px;resize:vertical}
+    textarea:focus,input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(105,167,255,.12)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:12px}
+    .buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+    .btn{border:0;border-radius:13px;padding:12px 16px;font-weight:850;cursor:pointer}
+    .primary{background:linear-gradient(135deg,#6ea8ff,#8c7dff);color:white;box-shadow:0 10px 25px rgba(105,167,255,.25)}
+    .secondary{background:#202a45;color:var(--text);border:1px solid #344261}
+    .danger{background:rgba(255,107,122,.12);color:#ff9ba6;border:1px solid rgba(255,107,122,.25)}
+    .referee{padding:18px}
+    .refbox{background:#0b1120;border:1px dashed #3a496f;border-radius:16px;padding:15px;color:#dce3f5;min-height:128px}
+    .ref-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .round{color:var(--gold);font-weight:900}
+    .contestants{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
+    .bot{padding:16px;position:relative;overflow:hidden}
+    .bot:before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--accent)}
+    .bothead{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+    .avatar{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 18%, transparent);
+      border:1px solid color-mix(in srgb,var(--accent) 45%, transparent);font-size:20px}
+    .name{font-weight:900}.role{font-size:12px;color:var(--muted)}
+    .score{margin-left:auto;font-size:22px;font-weight:950;color:var(--accent)}
+    .answer{min-height:92px;color:#dbe3f8;line-height:1.45;font-size:14px}
+    .typing{display:inline-flex;gap:5px;align-items:center;color:var(--muted)}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:bounce 1s infinite}
+    .dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
+    @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-5px);opacity:1}}
+    .badge{display:inline-block;margin-top:10px;padding:6px 9px;border-radius:999px;font-size:11px;font-weight:900}
+    .correct{color:var(--green);background:rgba(101,230,167,.1);border:1px solid rgba(101,230,167,.22)}
+    .wrong{color:#ff9ba6;background:rgba(255,107,122,.1);border:1px solid rgba(255,107,122,.2)}
+    .waiting{color:var(--muted);background:rgba(174,183,204,.08);border:1px solid rgba(174,183,204,.16)}
+    .log{margin-top:16px;padding:17px}
+    .loglist{display:grid;gap:9px;max-height:220px;overflow:auto}
+    .logitem{padding:11px 12px;border-radius:12px;background:#0b1120;border:1px solid #26314e;color:#cdd6ea;font-size:13px}
+    footer{text-align:center;color:#7f8aa5;font-size:12px;margin-top:22px}
+    @media(max-width:900px){
+      .grid{grid-template-columns:1fr}.contestants{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:560px){
+      header{align-items:flex-start}.status{font-size:11px}.contestants{grid-template-columns:1fr}
+      .row{grid-template-columns:1fr}.wrap{padding:16px 12px 40px}.card{border-radius:18px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="trophy">🏆</div>
+        <div>
+          <h1>AI Tournament</h1>
+          <div class="subtitle">Autocorrect Arena — prototype match engine</div>
+        </div>
+      </div>
+      <div class="status">● LIVE PROTOTYPE</div>
+    </header>
+
+    <section class="grid">
+      <div class="card challenge">
+        <h2>Create the challenge</h2>
+        <label for="corrupted">Corrupted message</label>
+        <textarea id="corrupted">NotnunsFe it autocorrected</textarea>
+        <div class="row">
+          <div>
+            <label for="target">Correct answer</label>
+            <input id="target" value="unsafe" />
+          </div>
+          <div>
+            <label for="hint">Hint</label>
+            <input id="hint" value="A word describing whether something is dangerous" />
+          </div>
+        </div>
+        <div class="buttons">
+          <button class="btn primary" id="start">▶ Start Match</button>
+          <button class="btn secondary" id="hintBtn">💡 Reveal Hint</button>
+          <button class="btn danger" id="reset">↺ Reset</button>
+        </div>
+      </div>
+
+      <div class="card referee">
+        <div class="ref-title">
+          <h2>🎤 Referee</h2>
+          <div class="round" id="round">ROUND 1</div>
+        </div>
+        <div class="refbox" id="refbox">
+          Challenge loaded. Press <b>Start Match</b> to let the contestants take their turns.
+        </div>
+      </div>
+    </section>
+
+    <section class="contestants">
+      <article class="card bot" style="--accent:#69a7ff" data-bot="ChatGPT">
+        <div class="bothead"><div class="avatar">🤖</div><div><div class="name">ChatGPT</div><div class="role">The Analyst</div></div><div class="score">0</div></div>
+        <div class="answer">Waiting for the match.</div><span class="badge waiting">READY</span>
+      </article>
+      <article class="card bot" style="--accent:#b58cff" data-bot="Gemini">
+        <div class="bothead"><div class="avatar">💎</div><div><div class="name">Gemini</div><div class="role">The Explorer</div></div><div class="score">0</div></div>
+        <div class="answer">Waiting for the match.</div><span class="badge waiting">READY</span>
+      </article>
+      <article class="card bot" style="--accent:#63e6ff" data-bot="Claude">
+        <div class="bothead"><div class="avatar">🧠</div><div><div class="name">Claude</div><div class="role">The Philosopher</div></div><div class="score">0</div></div>
+        <div class="answer">Waiting for the match.</div><span class="badge waiting">READY</span>
+      </article>
+      <article class="card bot" style="--accent:#ffd166" data-bot="Duck">
+        <div class="bothead"><div class="avatar">🦆</div><div><div class="name">Duck</div><div class="role">The Speedster</div></div><div class="score">0</div></div>
+        <div class="answer">Waiting for the match.</div><span class="badge waiting">READY</span>
+      </article>
+    </section>
+
+    <section class="card log">
+      <h2>Match history</h2>
+      <div class="loglist" id="log">
+        <div class="logitem">The arena is ready.</div>
+      </div>
+    </section>
+
+    <footer>Prototype v0.1 — simulated contestants now; live AI APIs come next.</footer>
+  </div>
+
+  <script>
+    const bots = [...document.querySelectorAll('.bot')];
+    const start = document.getElementById('start');
+    const reset = document.getElementById('reset');
+    const hintBtn = document.getElementById('hintBtn');
+    const refbox = document.getElementById('refbox');
+    const log = document.getElementById('log');
+    let running = false;
+
+    const guesses = {
+      ChatGPT: ['unsafe'],
+      Gemini: ['unsure'],
+      Claude: ['unsafe'],
+      Duck: ['unfair']
+    };
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const addLog = text => {
+      const item = document.createElement('div');
+      item.className = 'logitem';
+      item.textContent = text;
+      log.prepend(item);
+    };
+
+    function setBot(bot, text, state='waiting') {
+      bot.querySelector('.answer').innerHTML = text;
+      const badge = bot.querySelector('.badge');
+      badge.className = 'badge ' + state;
+      badge.textContent = state === 'correct' ? '✓ CORRECT' : state === 'wrong' ? '✕ WRONG' : 'THINKING';
+    }
+
+    async function runMatch() {
+      if (running) return;
+      running = true;
+      start.disabled = true;
+      const target = document.getElementById('target').value.trim().toLowerCase();
+      const corrupted = document.getElementById('corrupted').value.trim();
+      refbox.innerHTML = `Contestants must recover the intended word from:<br><br><b>“${corrupted}”</b>`;
+      addLog('Round started: ' + corrupted);
+
+      bots.forEach(bot => {
+        setBot(bot, '<span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>');
+      });
+
+      for (const bot of bots) {
+        await sleep(900);
+        const name = bot.dataset.bot;
+        const guess = guesses[name][0];
+        const duplicate = [...bots].some(other =>
+          other !== bot &&
+          other.dataset.finished === '1' &&
+          other.querySelector('.answer').textContent.replace('My guess: ','').trim().toLowerCase() === guess.toLowerCase()
+        );
+
+        if (duplicate) {
+          setBot(bot, `My guess: <b>${guess}</b><br><small>Duplicate answer rejected by referee.</small>`, 'wrong');
+          addLog(`${name} guessed “${guess}” — duplicate rejected.`);
+        } else {
+          const correct = guess.toLowerCase() === target;
+          setBot(bot, `My guess: <b>${guess}</b>`, correct ? 'correct' : 'wrong');
+          if (correct) {
+            bot.querySelector('.score').textContent = Number(bot.querySelector('.score').textContent) + 1;
+            addLog(`${name} guessed “${guess}” — correct!`);
+          } else {
+            addLog(`${name} guessed “${guess}” — incorrect.`);
+          }
+        }
+        bot.dataset.finished = '1';
+      }
+
+      const winners = bots.filter(bot => bot.querySelector('.badge').classList.contains('correct'))
+                          .map(bot => bot.dataset.bot);
+      refbox.innerHTML = winners.length
+        ? `🏆 Winner${winners.length > 1 ? 's' : ''}: <b>${winners.join(' and ')}</b><br>The intended word was <b>${target}</b>.`
+        : `No winner this round. The intended word was <b>${target}</b>.`;
+      running = false;
+      start.disabled = false;
+    }
+
+    function resetMatch() {
+      running = false;
+      start.disabled = false;
+      bots.forEach(bot => {
+        bot.dataset.finished = '0';
+        bot.querySelector('.score').textContent = '0';
+        setBot(bot, 'Waiting for the match.', 'waiting');
+        bot.querySelector('.badge').textContent = 'READY';
+      });
+      refbox.innerHTML = 'Challenge loaded. Press <b>Start Match</b> to let the contestants take their turns.';
+      log.innerHTML = '<div class="logitem">The arena is ready.</div>';
+    }
+
+    hintBtn.addEventListener('click', () => {
+      const hint = document.getElementById('hint').value.trim();
+      refbox.innerHTML = `💡 <b>Hint:</b> ${hint || 'No hint entered.'}`;
+      addLog('Hint revealed.');
+    });
+    start.addEventListener('click', runMatch);
+    reset.addEventListener('click', resetMatch);
+  </script>
+</body>
+</html>
