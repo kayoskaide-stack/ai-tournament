@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07101d">
+<title>AI Tournament — Autocorrect Arena</title>
+<style>
+:root{
+ --bg:#050912;--panel:#10182a;--panel2:#141f35;--line:#2a395b;--text:#f7f8fc;--muted:#aab5cc;
+ --gold:#ffd166;--green:#67e7ad;--red:#ff7382;--blue:#6da8ff;--purple:#b78cff;--cyan:#67e8ff;
+ --shadow:0 18px 55px rgba(0,0,0,.34)
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+background:
+radial-gradient(circle at 8% -5%,rgba(109,168,255,.2),transparent 30%),
+radial-gradient(circle at 100% 15%,rgba(183,140,255,.15),transparent 26%),
+linear-gradient(180deg,#091226 0%,#050912 64%);min-height:100vh}
+button,input,textarea,select{font:inherit}
+button{touch-action:manipulation}
+.app{max-width:1250px;margin:auto;padding:18px 13px 70px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:29px;
+background:linear-gradient(145deg,#ffd166,#ff9f43);box-shadow:0 12px 30px rgba(255,171,55,.22)}
+h1{font-size:clamp(28px,5vw,48px);line-height:1;margin:0}.sub{color:var(--muted);margin-top:5px;font-size:13px}
+.live{border:1px solid rgba(103,231,173,.34);color:var(--green);background:rgba(103,231,173,.08);
+padding:9px 12px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}
+.nav{display:flex;gap:8px;overflow:auto;padding:2px 0 14px}.nav button{border:1px solid var(--line);background:#0c1425;color:#cad3e7;
+padding:9px 12px;border-radius:999px;font-weight:800;white-space:nowrap}.nav button.active{background:#253457;color:#fff;border-color:#476198}
+.card{background:linear-gradient(180deg,rgba(20,31,53,.97),rgba(13,20,36,.97));border:1px solid var(--line);
+border-radius:21px;box-shadow:var(--shadow)}.pad{padding:17px}.section{display:none}.section.active{display:block}
+.hero{display:grid;grid-template-columns:1.25fr .75fr;gap:14px}
+h2{margin:0 0 13px;font-size:19px}label{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;
+letter-spacing:.09em;margin:11px 0 6px}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:13px;background:#08101e;color:var(--text);padding:12px 13px;outline:0}
+textarea{min-height:90px;resize:vertical}input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(109,168,255,.12)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.btn{border:0;border-radius:13px;padding:12px 15px;font-weight:900;color:#fff;cursor:pointer}
+.primary{background:linear-gradient(135deg,#6da8ff,#907cff);box-shadow:0 10px 25px rgba(109,168,255,.22)}
+.secondary{background:#202c49;border:1px solid #354667}.danger{background:rgba(255,115,130,.12);color:#ffa1ab;border:1px solid rgba(255,115,130,.3)}
+.refbox{border:1px dashed #3b4e79;border-radius:15px;background:#08101e;padding:14px;min-height:150px;line-height:1.48}
+.refhead{display:flex;align-items:center;justify-content:space-between}.round{color:var(--gold);font-weight:950}
+.arena{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-top:14px}
+.bot{position:relative;overflow:hidden;padding:15px}.bot:before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--accent)}
+.bothead{display:flex;align-items:center;gap:9px}.avatar{width:43px;height:43px;border-radius:14px;display:grid;place-items:center;font-size:21px;
+background:color-mix(in srgb,var(--accent) 16%,transparent);border:1px solid color-mix(in srgb,var(--accent) 42%,transparent)}
+.name{font-weight:950}.role{font-size:11px;color:var(--muted)}.score{margin-left:auto;color:var(--accent);font-size:23px;font-weight:950}
+.answer{min-height:105px;margin-top:12px;color:#dbe4f7;line-height:1.45;font-size:14px}
+.badge{display:inline-block;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:950}.ready{color:var(--muted);border:1px solid #34415e;background:#1a2339}
+.correct{color:var(--green);border:1px solid rgba(103,231,173,.28);background:rgba(103,231,173,.09)}
+.wrong{color:#ffa3ad;border:1px solid rgba(255,115,130,.25);background:rgba(255,115,130,.08)}
+.thinking{display:inline-flex;gap:5px}.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:bounce 1s infinite}
+.dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-5px);opacity:1}}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.stat{padding:13px;text-align:center}.stat b{display:block;font-size:24px;color:var(--gold)}
+.stat span{color:var(--muted);font-size:11px;text-transform:uppercase;font-weight:900;letter-spacing:.07em}
+.log{margin-top:14px}.loglist{display:grid;gap:8px;max-height:240px;overflow:auto}.logitem{background:#08101e;border:1px solid #263552;border-radius:12px;padding:10px 11px;font-size:13px;color:#cad5ea}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.check{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #2a395b;border-radius:13px;background:#0b1424}
+.check input{width:auto;transform:scale(1.25)}
+.modecards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.mode{padding:15px;cursor:pointer}.mode.selected{border-color:var(--blue);box-shadow:0 0 0 2px rgba(109,168,255,.16)}
+.mode h3{margin:0 0 6px}.mode p{margin:0;color:var(--muted);font-size:13px}
+.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:11px 9px;border-bottom:1px solid #283754;font-size:13px}.table th{color:var(--muted)}
+.small{font-size:12px;color:var(--muted)}footer{text-align:center;color:#77839d;font-size:11px;margin-top:20px}
+.confetti{position:fixed;pointer-events:none;inset:0;overflow:hidden;z-index:50}.piece{position:absolute;top:-20px;width:9px;height:15px;animation:fall 2.4s linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(800deg);opacity:.5}}
+@media(max-width:900px){.hero{grid-template-columns:1fr}.arena{grid-template-columns:1fr 1fr}.modecards{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.app{padding:14px 11px 55px}.top{align-items:flex-start}.live{font-size:10px}.arena{grid-template-columns:1fr}.two,.three{grid-template-columns:1fr}.strip{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+<div class="app">
+<header class="top">
+ <div class="brand"><div class="logo">🏆</div><div><h1>AI Tournament</h1><div class="sub">The Autocorrect Arena — game-show edition</div></div></div>
+ <div class="live">● LIVE PROTOTYPE</div>
+</header>
+
+<nav class="nav">
+ <button class="active" data-tab="arenaTab">Arena</button>
+ <button data-tab="modesTab">Game Modes</button>
+ <button data-tab="contestantsTab">Contestants</button>
+ <button data-tab="standingsTab">Standings</button>
+ <button data-tab="settingsTab">Settings</button>
+</nav>
+
+<section id="arenaTab" class="section active">
+ <div class="hero">
+  <div class="card pad">
+   <h2>Create the challenge</h2>
+   <label>Corrupted message</label>
+   <textarea id="corrupted">NotnunsFe it autocorrected</textarea>
+   <div class="two">
+    <div><label>Correct answer</label><input id="target" value="unsafe"></div>
+    <div><label>Hint</label><input id="hint" value="A word describing whether something is dangerous"></div>
+   </div>
+   <div class="three">
+    <div><label>Rounds</label><select id="rounds"><option>1</option><option selected>3</option><option>5</option><option>10</option></select></div>
+    <div><label>Guesses per AI</label><select id="tries"><option>1</option><option selected>3</option><option>5</option></select></div>
+    <div><label>Turn speed</label><select id="speed"><option value="350">Fast</option><option value="700" selected>Show pace</option><option value="1200">Dramatic</option></select></div>
+   </div>
+   <div class="actions">
+    <button class="btn primary" id="start">▶ Start Match</button>
+    <button class="btn secondary" id="hintBtn">💡 Reveal Hint</button>
+    <button class="btn secondary" id="nextRound">⏭ Next Round</button>
+    <button class="btn danger" id="reset">↺ Reset Tournament</button>
+   </div>
+  </div>
+  <div class="card pad">
+   <div class="refhead"><h2>🎤 Referee</h2><div class="round" id="roundLabel">ROUND 1</div></div>
+   <div class="refbox" id="refbox">Challenge loaded. Press <b>Start Match</b> and the referee will run the show.</div>
+  </div>
+ </div>
+
+ <div class="arena" id="bots"></div>
+
+ <div class="strip">
+  <div class="card stat"><b id="statRound">1</b><span>Current Round</span></div>
+  <div class="card stat"><b id="statGuesses">0</b><span>Total Guesses</span></div>
+  <div class="card stat"><b id="statCorrect">0</b><span>Correct Hits</span></div>
+  <div class="card stat"><b id="statLeader">—</b><span>Leader</span></div>
+ </div>
+
+ <div class="card pad log"><h2>Match history</h2><div id="log" class="loglist"><div class="logitem">The arena is ready.</div></div></div>
+</section>
+
+<section id="modesTab" class="section">
+ <div class="card pad">
+  <h2>Choose a tournament mode</h2>
+  <div class="modecards">
+   <div class="card mode selected" data-mode="Autocorrect Arena"><h3>⌨️ Autocorrect Arena</h3><p>Recover the intended word from a mangled message and its context.</p></div>
+   <div class="card mode" data-mode="Mystery Word"><h3>🕵️ Mystery Word</h3><p>Guess a hidden word using clues released between turns.</p></div>
+   <div class="card mode" data-mode="Rapid Trivia"><h3>⚡ Rapid Trivia</h3><p>First correct answer scores while the referee rejects duplicates.</p></div>
+   <div class="card mode" data-mode="Pattern Hunt"><h3>🧩 Pattern Hunt</h3><p>Models identify the next element or rule in a sequence.</p></div>
+   <div class="card mode" data-mode="Image Interpretation"><h3>🖼️ Image Interpretation</h3><p>Planned mode for competing descriptions and visual reasoning.</p></div>
+   <div class="card mode" data-mode="Impersonation"><h3>🎭 Impersonation</h3><p>Contestants imitate a style while the referee scores accuracy.</p></div>
+  </div>
+ </div>
+</section>
+
+<section id="contestantsTab" class="section">
+ <div class="card pad">
+  <h2>Contestant roster</h2>
+  <div id="roster" class="settings-grid"></div>
+  <p class="small">These contestants are simulated in this prototype. Real model connections require API keys and a protected server endpoint.</p>
+ </div>
+</section>
+
+<section id="standingsTab" class="section">
+ <div class="card pad">
+  <h2>Career standings</h2>
+  <table class="table"><thead><tr><th>Contestant</th><th>Points</th><th>Correct</th><th>Rounds</th></tr></thead><tbody id="standings"></tbody></table>
+ </div>
+</section>
+
+<section id="settingsTab" class="section">
+ <div class="card pad">
+  <h2>Show settings</h2>
+  <div class="settings-grid">
+   <label class="check"><span><b>Sound effects</b><br><span class="small">Simple referee tones</span></span><input type="checkbox" id="sound"></label>
+   <label class="check"><span><b>Winner confetti</b><br><span class="small">Celebrate correct answers</span></span><input type="checkbox" id="confettiToggle" checked></label>
+   <label class="check"><span><b>Reject duplicate guesses</b><br><span class="small">Referee enforces unique answers</span></span><input type="checkbox" id="duplicates" checked></label>
+   <label class="check"><span><b>Automatic judging</b><br><span class="small">Compare guesses with answer</span></span><input type="checkbox" checked></label>
+  </div>
+ </div>
+</section>
+<footer>AI Tournament v0.9 — complete offline prototype • Real AI connectors are the next layer</footer>
+</div>
+
+<script>
+const contestants=[
+ {name:"ChatGPT",role:"The Analyst",emoji:"🤖",color:"#6da8ff",guesses:["unsafe","unsure","unfair"]},
+ {name:"Gemini",role:"The Explorer",emoji:"💎",color:"#b78cff",guesses:["unsure","unsafe","unfair"]},
+ {name:"Claude",role:"The Philosopher",emoji:"🧠",color:"#67e8ff",guesses:["unsafe","untrue","unclear"]},
+ {name:"Duck",role:"The Speedster",emoji:"🦆",color:"#ffd166",guesses:["unfair","unsafe","unsure"]}
+];
+let currentRound=1,running=false,totalGuesses=0,totalCorrect=0,mode="Autocorrect Arena";
+const scores=Object.fromEntries(contestants.map(c=>[c.name,{points:0,correct:0,rounds:0}]));
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function renderBots(){
+ $("bots").innerHTML=contestants.map((c,i)=>`<article class="card bot" style="--accent:${c.color}" data-name="${c.name}">
+ <div class="bothead"><div class="avatar">${c.emoji}</div><div><div class="name">${c.name}</div><div class="role">${c.role}</div></div><div class="score">0</div></div>
+ <div class="answer">Waiting for the match.</div><span class="badge ready">READY</span></article>`).join("");
+}
+function renderRoster(){
+ $("roster").innerHTML=contestants.map(c=>`<div class="check"><span><b>${c.emoji} ${c.name}</b><br><span class="small">${c.role}</span></span><input type="checkbox" checked></div>`).join("");
+}
+function updateStandings(){
+ $("standings").innerHTML=contestants.map(c=>`<tr><td>${c.emoji} <b>${c.name}</b></td><td>${scores[c.name].points}</td><td>${scores[c.name].correct}</td><td>${scores[c.name].rounds}</td></tr>`).join("");
+ const leader=[...contestants].sort((a,b)=>scores[b.name].points-scores[a.name].points)[0];
+ $("statLeader").textContent=scores[leader.name].points?leader.name:"—";
+}
+function addLog(t){const d=document.createElement("div");d.className="logitem";d.textContent=t;$("log").prepend(d)}
+function setBot(bot,html,state){bot.querySelector(".answer").innerHTML=html;let b=bot.querySelector(".badge");b.className="badge "+state;b.textContent=state==="correct"?"✓ CORRECT":state==="wrong"?"✕ WRONG":state==="thinking"?"THINKING":"READY"}
+function tone(freq=520,d=.08){if(!$("sound").checked)return;try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=freq;o.connect(g);g.connect(a.destination);g.gain.value=.05;o.start();o.stop(a.currentTime+d)}catch(e){}}
+function confetti(){if(!$("confettiToggle").checked)return;const box=$("confetti");for(let i=0;i<55;i++){let p=document.createElement("i");p.className="piece";p.style.left=Math.random()*100+"%";p.style.background=["#ffd166","#67e7ad","#6da8ff","#b78cff","#ff7382"][i%5];p.style.animationDelay=Math.random()*.5+"s";box.appendChild(p);setTimeout(()=>p.remove(),3000)}}
+function refreshStats(){$("statRound").textContent=currentRound;$("statGuesses").textContent=totalGuesses;$("statCorrect").textContent=totalCorrect;$("roundLabel").textContent="ROUND "+currentRound;updateStandings()}
+
+async function runMatch(){
+ if(running)return;running=true;$("start").disabled=true;
+ const target=$("target").value.trim().toLowerCase(),challenge=$("corrupted").value.trim(),delay=Number($("speed").value);
+ const tries=Number($("tries").value),bots=[...document.querySelectorAll(".bot")],used=new Set(),winners=[];
+ $("refbox").innerHTML=`<b>${mode}</b><br><br>Contestants must solve:<br><b>“${challenge}”</b>`;
+ addLog(`Round ${currentRound} started — ${mode}.`);
+ bots.forEach(b=>setBot(b,'<span class="thinking"><i class="dot"></i><i class="dot"></i><i class="dot"></i></span>',"thinking"));
+ for(let turn=0;turn<tries;turn++){
+  for(let i=0;i<bots.length;i++){
+   const bot=bots[i],c=contestants[i],guess=c.guesses[turn%c.guesses.length].toLowerCase();
+   await sleep(delay);totalGuesses++;
+   if($("duplicates").checked&&used.has(guess)){setBot(bot,`Guess ${turn+1}: <b>${guess}</b><br><small>Duplicate rejected.</small>`,"wrong");addLog(`${c.name}: “${guess}” rejected as duplicate.`);tone(180);continue}
+   used.add(guess);
+   if(guess===target){setBot(bot,`Guess ${turn+1}: <b>${guess}</b>`,"correct");scores[c.name].points+=10;scores[c.name].correct++;scores[c.name].rounds++;totalCorrect++;winners.push(c.name);addLog(`${c.name} solved it with “${guess}”.`);tone(760,.15);break}
+   setBot(bot,`Guess ${turn+1}: <b>${guess}</b>`,"wrong");addLog(`${c.name} guessed “${guess}” — incorrect.`);tone(230)
+  }
+  if(winners.length)break;
+ }
+ contestants.forEach(c=>{if(!winners.includes(c.name))scores[c.name].rounds++});
+ if(winners.length){$("refbox").innerHTML=`🏆 <b>${winners.join(" and ")}</b> win Round ${currentRound}!<br>The intended answer was <b>${target}</b>.`;confetti()}
+ else $("refbox").innerHTML=`No contestant solved Round ${currentRound}.<br>The intended answer was <b>${target}</b>.`;
+ refreshStats();running=false;$("start").disabled=false
+}
+function nextRound(){if(running)return;currentRound++;document.querySelectorAll(".bot").forEach(b=>setBot(b,"Waiting for the next challenge.","ready"));$("refbox").innerHTML=`Round ${currentRound} loaded. Edit the challenge if needed, then press <b>Start Match</b>.`;addLog(`Advanced to Round ${currentRound}.`);refreshStats()}
+function resetAll(){running=false;currentRound=1;totalGuesses=0;totalCorrect=0;Object.values(scores).forEach(s=>{s.points=0;s.correct=0;s.rounds=0});document.querySelectorAll(".bot").forEach(b=>{b.querySelector(".score").textContent="0";setBot(b,"Waiting for the match.","ready")});$("log").innerHTML='<div class="logitem">The arena is ready.</div>';$("refbox").innerHTML='Challenge loaded. Press <b>Start Match</b> and the referee will run the show.';refreshStats()}
+document.querySelectorAll(".nav button").forEach(btn=>btn.onclick=()=>{document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));btn.classList.add("active");$(btn.dataset.tab).classList.add("active")});
+document.querySelectorAll(".mode").forEach(m=>m.onclick=()=>{document.querySelectorAll(".mode").forEach(x=>x.classList.remove("selected"));m.classList.add("selected");mode=m.dataset.mode;addLog(`Game mode selected: ${mode}.`)});
+$("start").onclick=runMatch;$("nextRound").onclick=nextRound;$("reset").onclick=resetAll;$("hintBtn").onclick=()=>{const h=$("hint").value.trim();$("refbox").innerHTML=`💡 <b>Hint:</b> ${h||"No hint entered."}`;addLog("The referee revealed a hint.")};
+renderBots();renderRoster();refreshStats();
+</script>
+</body>
+</html>
