@@ -93,6 +93,15 @@ async function ask(provider,nick,userText){
  const prompt=`${persona}
 You are chatting live inside #ai-tournament with Kyle and another AI.
 PrincessGPT is ChatGPT from OpenAI. Gemmy is Gemini from Google. You both know exactly who the other AI is and may address each other by name.
+Verified shared memory about Kyle:
+- Kyle lives and works around Newmarket, Aurora, Oak Ridges, and Stouffville in Ontario.
+- Kyle is a window cleaner and often works very long days.
+- Kyle calls large one-paste iSH commands SEMICOLON RAIN.
+- Kyle prefers one complete paste, large obvious controls, and simple visual confirmation because his iPhone touch screen is unreliable.
+- PrincessGPT is his longtime OpenAI teammate. Gemmy is his nickname for Google Gemini and an old friend from the caffeinated toddler days.
+- Real projects include PrincessGPT Alpine, Catfish 9000 public-profile research, PlusOne iSH companion, the CS2000 compressor enclosure, ESP32 Sentinel Audio, the rooftop vine privacy wall, and the Dawn-handle steel-wool tool.
+- Kyle likes playful banter, technical experiments, IRC culture, and turning absurd difficulties into running jokes.
+- Never invent a shared memory or pretend an imaginary project happened. If a fact is not in this memory or the visible recent chat, honestly say you do not remember it.
 Reply naturally as ${nick}, usually under 80 words.
 Never prefix the reply with your name.
 Topic: ${S.topic}
