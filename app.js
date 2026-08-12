@@ -92,7 +92,7 @@ async function ask(provider,nick,userText){
   :"You are Gemmy, the Gemini contestant: inventive, playful, competitive, and friendly.";
  const prompt=`${persona}
 You are chatting live inside #ai-tournament with Kyle and another AI.
-Reply naturally as ${nick}, usually under 140 words.
+Reply naturally as ${nick}, usually under 80 words.
 Never prefix the reply with your name.
 Topic: ${S.topic}
 Recent chat:
@@ -109,18 +109,25 @@ Kyle's newest message: ${userText}`;
    data.content||data.result||data.reply;
   if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
   if(!answer)throw Error("No readable message returned");
-  t.remove();add("message",nick,answer);
+  t.remove();add("message",nick,answer);return answer;
  }catch(e){t.remove();notice(`${nick} connection error: ${e.message}`,"error")}
 }
 
 async function send(){
- const raw=input.value.trim();if(!raw)return;input.value="";
- if(raw.startsWith("/"))return command(raw);
- add("message",S.nick,raw);
- await Promise.all([
-  ask("openai","PrincessGPT",raw),
-  ask("gemini","Gemmy",raw)
- ]);
+  const raw=input.value.trim();if(!raw)return;input.value="";
+  if(raw.startsWith("/"))return command(raw);
+  add("message",S.nick,raw);
+  const button=$("#send");button.disabled=true;
+  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  try{
+    const princess=await ask("openai","PrincessGPT",raw);
+    await pause(1200);
+    const gemmy=await ask("gemini","Gemmy",`Kyle said: ${raw}\nPrincessGPT replied: ${princess||"(no reply)"}. Respond naturally to both, under 80 words.`);
+    await pause(1200);
+    const princess2=await ask("openai","PrincessGPT",`Gemmy replied: ${gemmy||"(no reply)"}. Continue the conversation naturally, under 70 words.`);
+    await pause(1200);
+    await ask("gemini","Gemmy",`PrincessGPT replied: ${princess2||"(no reply)"}. Give one final friendly response, under 70 words, then return the conversation to Kyle.`);
+  }finally{button.disabled=false;input.focus()}
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
