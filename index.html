@@ -1,83 +1,31 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#050914"><title>AI Tournament</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>#ai-tournament</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<div id="confetti"></div>
 <div class="app">
 <header>
-  <div class="brand"><div class="cup">🏆</div><div><h1>AI TOURNAMENT</h1><p>Where models enter. One answer survives.</p></div></div>
-  <div class="live">● ARENA LIVE</div>
+  <div class="heading"><i></i><b>#ai-tournament</b><small>LIVE</small></div>
+  <div id="topic">Topic: Kyle, PrincessGPT and Gemmy enter the arena.</div>
 </header>
 
-<nav id="tabs">
-<button class="on" data-tab="arena">Arena</button><button data-tab="create">Tournament Creator</button>
-<button data-tab="library">Challenge Library</button><button data-tab="standings">Standings</button><button data-tab="settings">Settings</button>
-</nav>
+<div class="main">
+  <section id="chat"></section>
+  <aside>
+    <h3>USERS — <span id="count">3</span></h3>
+    <div id="users"></div>
+  </aside>
+</div>
 
-<main>
-<section id="arena" class="tab on">
-  <div class="hero">
-    <div class="card setup">
-      <div class="eyebrow">CURRENT EVENT</div><h2 id="eventTitle">⌨️ Autocorrect Championship</h2>
-      <label>Corrupted message / challenge</label><textarea id="challenge">NotnunsFe it autocorrected</textarea>
-      <div class="cols"><div><label>Correct answer</label><input id="answer" value="unsafe"></div>
-      <div><label>Hint</label><input id="hint" value="A word meaning dangerous or not safe"></div></div>
-      <div class="cols3">
-       <div><label>Guesses / AI</label><select id="tries"><option>1</option><option selected>3</option><option>5</option></select></div>
-       <div><label>Turn pace</label><select id="pace"><option value="450">Fast</option><option value="800" selected>Game show</option><option value="1400">Dramatic</option></select></div>
-       <div><label>Points</label><select id="points"><option>5</option><option selected>10</option><option>25</option></select></div>
-      </div>
-      <div class="actions"><button class="primary" id="start">▶ START ROUND</button><button id="hintBtn">💡 HINT</button><button id="next">⏭ NEXT ROUND</button><button class="red" id="reset">↺ RESET</button></div>
-    </div>
-    <div class="card ref">
-      <div class="refTop"><div><div class="eyebrow">YOUR HOST</div><h2>🎤 The Referee</h2></div><strong id="round">ROUND 1</strong></div>
-      <div class="screen" id="refText">Ladies and gentlemen… welcome to the AI Tournament. The arena is ready.</div>
-      <div class="ticker"><span>MODE</span><b id="modeTicker">AUTOCORRECT</b><span>LEADER</span><b id="leader">—</b></div>
-    </div>
-  </div>
-
-  <div id="contestants" class="contestants"></div>
-
-  <div class="stats">
-   <div class="card"><b id="roundStat">1</b><span>Round</span></div><div class="card"><b id="guessStat">0</b><span>Guesses</span></div>
-   <div class="card"><b id="hitStat">0</b><span>Correct</span></div><div class="card"><b id="fastStat">—</b><span>Fastest</span></div>
-  </div>
-  <div class="card history"><div class="sectionHead"><h2>🎥 Match Replay</h2><button id="clearLog">Clear</button></div><div id="log"></div></div>
-</section>
-
-<section id="create" class="tab">
- <div class="card page"><div class="eyebrow">BUILD YOUR SHOW</div><h2>🎮 Tournament Creator</h2>
- <p class="muted">Pick a format. The same referee, scoring and contestant engine runs the show.</p>
- <div id="modes" class="modes"></div></div>
-</section>
-
-<section id="library" class="tab">
- <div class="card page"><div class="eyebrow">READY TO PLAY</div><h2>📚 Challenge Library</h2>
- <div id="challengeCards" class="modes"></div></div>
-</section>
-
-<section id="standings" class="tab">
- <div class="card page"><div class="eyebrow">SEASON BOARD</div><h2>🏅 Standings</h2>
- <table><thead><tr><th>AI</th><th>PTS</th><th>Wins</th><th>Accuracy</th></tr></thead><tbody id="standingsBody"></tbody></table></div>
-</section>
-
-<section id="settings" class="tab">
- <div class="card page"><div class="eyebrow">CONTROL ROOM</div><h2>⚙️ Settings</h2>
- <div class="settingGrid">
-  <label class="toggle"><span><b>Sound effects</b><small>Buzzers and victory tones</small></span><input id="sound" type="checkbox"></label>
-  <label class="toggle"><span><b>Confetti</b><small>Winner celebration</small></span><input id="confettiOn" type="checkbox" checked></label>
-  <label class="toggle"><span><b>Reject duplicates</b><small>No copying earlier guesses</small></span><input id="dupes" type="checkbox" checked></label>
-  <label class="toggle"><span><b>Real AI mode</b><small>Uses configured server API keys</small></span><input id="realAI" type="checkbox"></label>
- </div>
- <div class="apiStatus"><b>AI connectors:</b> <span id="apiStatus">checking…</span><p>Keys belong in Vercel Environment Variables — never in this webpage.</p></div>
- </div>
-</section>
-</main>
-<footer>AI Tournament v1.0 • Mobile-first tournament engine</footer>
+<footer>
+  <input id="input" autocomplete="off" placeholder="Message #ai-tournament or /help">
+  <button id="send">Send</button>
+</footer>
 </div>
 <script src="/app.js"></script>
-</body></html>
+</body>
+</html>

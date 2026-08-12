@@ -1,54 +1,129 @@
-const C=[
-{name:"ChatGPT",role:"The Analyst",emoji:"🤖",color:"#6ba8ff",provider:"openai"},
-{name:"Gemini",role:"The Explorer",emoji:"💎",color:"#b58cff",provider:"gemini"},
-{name:"Claude",role:"The Philosopher",emoji:"🧠",color:"#64e8ff",provider:"anthropic"},
-{name:"Grok",role:"The Maverick",emoji:"🚀",color:"#ff7283",provider:"xai"},
-{name:"Duck",role:"The Speedster",emoji:"🦆",color:"#ffd166",provider:"duck"}];
-const fallback={ChatGPT:["unsafe","unsure","unfair"],Gemini:["unsure","unsafe","unclear"],Claude:["untrue","unsafe","unclear"],Grok:["unfair","unsafe","unsure"],Duck:["unclear","unsafe","unfair"]};
-const modes=[
-["⌨️","Autocorrect Championship","Recover the intended word from a mangled real-world message."],
-["🔤","Hangman","Solve the word before the referee runs out of letters."],["🎬","Guess the Movie","Clues, quotes and plot fragments."],
-["🎵","Guess the Song","Identify a song from non-lyrical clues."],["🕵️","Mystery Object","Infer the object from progressively stronger clues."],
-["🧩","Pattern Recognition","Sequences, transformations and hidden rules."],["🖼️","Image Guessing","Compete on visual interpretation challenges."],
-["🧠","Logic Puzzles","Reasoning battles with one defensible solution."],["💻","Programming Battles","Compete on code reasoning and debugging."],
-["🌎","General Knowledge","Classic rapid-fire trivia."],["🎭","Impersonation","Style challenges scored by the referee."],
-["✨","Custom Challenge","You write the rules; the tournament engine runs them."]];
-const library=[
-["NotnunsFe it autocorrected","unsafe","A word meaning dangerous or not safe"],
-["I left my phone in the frudge","fridge","A kitchen appliance"],
-["Can you meat me outside?","meet","A verb meaning to get together"],
-["The whether is awful today","weather","Something you check before going outside"],
-["Turn the lites off please","lights","Things that illuminate a room"]];
-let state=JSON.parse(localStorage.getItem("ait-state")||"null")||{round:1,guesses:0,hits:0,fast:"—",scores:{}};
-C.forEach(c=>state.scores[c.name]??={pts:0,wins:0,attempts:0,hits:0});let running=false,currentMode="Autocorrect Championship";
-const $=x=>document.getElementById(x),sleep=n=>new Promise(r=>setTimeout(r,n));function save(){localStorage.setItem("ait-state",JSON.stringify(state))}
-function renderBots(){$("contestants").innerHTML=C.map(c=>`<article class="card bot" style="--accent:${c.color}" data-name="${c.name}"><div class="botHead"><div class="avatar">${c.emoji}</div><div><div class="botName">${c.name}</div><div class="role">${c.role}</div></div><div class="score">${state.scores[c.name].pts}</div></div><div class="answerBox">Waiting backstage.</div><span class="badge">READY</span></article>`).join("")}
-function renderModes(){$("modes").innerHTML=modes.map(m=>`<div class="mode"><h3>${m[0]} ${m[1]}</h3><p>${m[2]}</p><button onclick="chooseMode('${m[1].replaceAll("'","\\'")}')">Choose mode</button></div>`).join("")}
-function renderLibrary(){$("challengeCards").innerHTML=library.map((x,i)=>`<div class="mode"><h3>Challenge ${i+1}</h3><p>${x[0]}</p><button onclick="loadChallenge(${i})">Load into arena</button></div>`).join("")}
-function standings(){$("standingsBody").innerHTML=[...C].sort((a,b)=>state.scores[b.name].pts-state.scores[a.name].pts).map(c=>{let s=state.scores[c.name],acc=s.attempts?Math.round(s.hits/s.attempts*100):0;return `<tr><td>${c.emoji} <b>${c.name}</b></td><td>${s.pts}</td><td>${s.wins}</td><td>${acc}%</td></tr>`}).join("");let l=[...C].sort((a,b)=>state.scores[b.name].pts-state.scores[a.name].pts)[0];$("leader").textContent=state.scores[l.name].pts?l.name:"—"}
-function stats(){$("round").textContent="ROUND "+state.round;$("roundStat").textContent=state.round;$("guessStat").textContent=state.guesses;$("hitStat").textContent=state.hits;$("fastStat").textContent=state.fast;standings();save()}
-function log(t){let d=document.createElement("div");d.className="log";d.textContent=t;$("log").prepend(d)}
-function botState(el,text,kind=""){el.querySelector(".answerBox").innerHTML=text;let b=el.querySelector(".badge");b.className="badge "+kind;b.textContent=kind==="good"?"✓ CORRECT":kind==="bad"?"✕ MISS":"THINKING"}
-function tone(f=500){if(!$("sound").checked)return;try{let a=new(window.AudioContext||window.webkitAudioContext),o=a.createOscillator(),g=a.createGain();o.frequency.value=f;g.gain.value=.04;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.1)}catch{}}
-function celebrate(){if(!$("confettiOn").checked)return;for(let i=0;i<60;i++){let p=document.createElement("i");p.className="conf";p.style.left=Math.random()*100+"%";p.style.background=["#ffd166","#68e8ad","#6ba8ff","#b58cff","#ff7283"][i%5];p.style.animationDelay=Math.random()*.4+"s";$("confetti").appendChild(p);setTimeout(()=>p.remove(),3000)}}
-async function askReal(c,challenge,hint,used){let r=await fetch("/api/contestant",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({provider:c.provider,name:c.name,mode:currentMode,challenge,hint,used})});if(!r.ok)throw new Error("connector unavailable");let j=await r.json();return (j.guess||"").trim().toLowerCase()}
-async function run(){
-if(running)return;running=true;$("start").disabled=true;let challenge=$("challenge").value.trim(),target=$("answer").value.trim().toLowerCase(),hint=$("hint").value.trim(),tries=+$("tries").value,pace=+$("pace").value,points=+$("points").value,used=new Set(),winner=null,startTime=performance.now();
-$("refText").innerHTML=`🎙️ <b>Round ${state.round}!</b><br>${currentMode}<br><br>“${challenge}”`;log(`Round ${state.round}: ${challenge}`);
-let bots=[...document.querySelectorAll(".bot")];bots.forEach(b=>botState(b,'<span class="dots"><i></i><i></i><i></i></span>'));
-outer:for(let t=0;t<tries;t++){for(let i=0;i<C.length;i++){await sleep(pace);let c=C[i],guess;try{guess=$("realAI").checked?await askReal(c,challenge,hint,[...used]):fallback[c.name][t%fallback[c.name].length]}catch{guess=fallback[c.name][t%fallback[c.name].length]}
-guess=guess.toLowerCase();state.guesses++;state.scores[c.name].attempts++;
-if($("dupes").checked&&used.has(guess)){botState(bots[i],`Guess ${t+1}: <b>${guess}</b><br><small>Referee: duplicate rejected.</small>`,"bad");log(`${c.name}: ${guess} — duplicate rejected.`);tone(180);continue}
-used.add(guess);if(guess===target){let secs=((performance.now()-startTime)/1000).toFixed(1);winner=c;state.hits++;state.fast=secs+"s";state.scores[c.name].pts+=points;state.scores[c.name].wins++;state.scores[c.name].hits++;botState(bots[i],`Guess ${t+1}: <b>${guess}</b><br>⚡ ${secs}s`,"good");log(`${c.name} WINS with “${guess}” in ${secs}s!`);tone(800);break outer}else{botState(bots[i],`Guess ${t+1}: <b>${guess}</b>`,"bad");log(`${c.name}: “${guess}” — wrong.`);tone(220)}}}
-if(winner){$("refText").innerHTML=`🏆 <b>${winner.name} WINS!</b><br><br>“${target}” is correct.<br>+${points} points to ${winner.name}.`;celebrate()}else $("refText").innerHTML=`❌ No winner this round.<br><br>The answer was <b>${target}</b>.`;
-renderBots();stats();running=false;$("start").disabled=false}
-function chooseMode(m){currentMode=m;$("eventTitle").textContent="🎮 "+m;$("modeTicker").textContent=m.toUpperCase();document.querySelector('[data-tab="arena"]').click();$("refText").innerHTML=`🎤 ${m} selected. Load a challenge and start the round.`}
-function loadChallenge(i){let x=library[i];$("challenge").value=x[0];$("answer").value=x[1];$("hint").value=x[2];chooseMode("Autocorrect Championship")}
-window.chooseMode=chooseMode;window.loadChallenge=loadChallenge;
-document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#tabs button,.tab").forEach(x=>x.classList.remove("on"));b.classList.add("on");$(b.dataset.tab).classList.add("on");if(b.dataset.tab==="standings")standings()});
-$("start").onclick=run;$("hintBtn").onclick=()=>{$("refText").innerHTML="💡 <b>HINT:</b><br>"+$("hint").value;log("The referee revealed a hint.")};
-$("next").onclick=()=>{state.round++;stats();$("refText").innerHTML=`🎤 Round ${state.round} is ready. New challenge, same arena.`;renderBots()};
-$("reset").onclick=()=>{if(!confirm("Reset tournament scores and history?"))return;localStorage.removeItem("ait-state");location.reload()};
-$("clearLog").onclick=()=>{$("log").innerHTML=""};
-renderBots();renderModes();renderLibrary();stats();
-fetch("/api/status").then(r=>r.json()).then(j=>$("apiStatus").textContent=j.configured?.length?j.configured.join(", ")+" configured":"No private API keys configured yet — simulation mode is ready.").catch(()=>$("apiStatus").textContent="Simulation mode ready.");
+const $=s=>document.querySelector(s),chat=$("#chat"),input=$("#input");
+let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
+ nick:"Kyle",topic:"Kyle, PrincessGPT and Gemmy enter the arena.",
+ present:{PrincessGPT:1,Gemmy:1},banned:{},ops:{Kyle:1},voices:{},
+ modes:{m:0,i:0},history:[]
+};
+const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
+const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const time=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+const colour=n=>n===S.nick?"kyle":n==="PrincessGPT"?"princess":"gemmy";
+
+function add(type,nick,text,keep=true){
+ const d=document.createElement("div");d.className="line "+type;
+ d.innerHTML=type==="message"
+  ?`<span class=time>${time()}</span> &lt;<span class="nick ${colour(nick)}">${safe(nick)}</span>&gt; ${safe(text)}`
+  :type==="action"
+  ?`<span class=time>${time()}</span> * <span class=${colour(nick)}>${safe(nick)}</span> ${safe(text)}`
+  :`<span class=time>${time()}</span> ${safe(text)}`;
+ chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+ if(keep&&(type==="message"||type==="action")){
+  S.history.push({nick,text});S.history=S.history.slice(-20);save();
+ }
+}
+function name(x){
+ x=String(x||"").toLowerCase();
+ if(["princess","princessgpt","chatgpt","gpt"].includes(x))return"PrincessGPT";
+ if(["gemmy","gemini","gem"].includes(x))return"Gemmy";
+ if(x==="kyle"||x===S.nick.toLowerCase())return S.nick;
+}
+function render(){
+ let a=[S.nick,...["PrincessGPT","Gemmy"].filter(n=>S.present[n])];
+ $("#users").innerHTML=a.map(n=>`<div class="user ${colour(n)}">${S.ops[n]?"@":S.voices[n]?"+":""}${safe(n)}</div>`).join("");
+ $("#count").textContent=a.length;
+ $("#topic").textContent="Topic: "+S.topic;
+}
+function notice(x,type="system"){add(type,"",x,false)}
+function help(){
+ ["Commands: /me /topic /nick /whois /names",
+  "/op /deop /voice /devoice /kick /ban /unban /invite",
+  "/mode +m|-m · /mode +i|-i · /clear · /reset"
+ ].forEach(x=>notice(x));
+}
+function command(raw){
+ let p=raw.slice(1).trim().split(/\s+/),c=(p.shift()||"").toLowerCase(),r=p.join(" "),n=name(p[0]);
+ if(c==="me"){if(r)add("action",S.nick,r);return}
+ if(c==="help"){help();return}
+ if(c==="topic"){if(r){S.topic=r;save();render();notice(`${S.nick} changed the topic to: ${r}`)}else notice("Topic: "+S.topic);return}
+ if(c==="nick"){if(!r)return notice("Usage: /nick NewName","error");let old=S.nick;S.nick=r.slice(0,24);S.ops[S.nick]=1;save();render();return notice(`${old} is now known as ${S.nick}`)}
+ if(c==="names"){return notice($("#users").innerText.replace(/\n/g," · "))}
+ if(c==="whois"){return notice(n?`${n} — ${n===S.nick?"human operator":n==="PrincessGPT"?"OpenAI contestant":"Google Gemini contestant"}`:"No such nick",n?"system":"error")}
+ if(["op","deop","voice","devoice"].includes(c)){
+  if(!n)return notice("No such nick","error");
+  if(c==="op")S.ops[n]=1;if(c==="deop"&&n!==S.nick)delete S.ops[n];
+  if(c==="voice")S.voices[n]=1;if(c==="devoice")delete S.voices[n];
+  save();render();return notice(`${S.nick} sets ${c} on ${n}`);
+ }
+ if(c==="kick"){
+  if(!n||n===S.nick)return notice("That user cannot be kicked","error");
+  S.present[n]=0;save();render();return notice(`${n} was kicked by ${S.nick}${p.slice(1).length?" ("+p.slice(1).join(" ")+")":""}`);
+ }
+ if(c==="ban"||c==="unban"){
+  if(!n||n===S.nick)return notice("That ban cannot be set","error");
+  S.banned[n]=c==="ban";if(c==="ban")S.present[n]=0;
+  save();render();return notice(`${S.nick} ${c==="ban"?"banned":"unbanned"} ${n}`);
+ }
+ if(c==="invite"){
+  if(!n||n===S.nick)return notice("No such AI contestant","error");
+  if(S.banned[n])return notice(`${n} is banned. Use /unban ${n} first.`,"error");
+  S.present[n]=1;save();render();return notice(`${n} joined #ai-tournament`);
+ }
+ if(c==="mode"){
+  let m=p[0];
+  if(m==="+m")S.modes.m=1;else if(m==="-m")S.modes.m=0;
+  else if(m==="+i")S.modes.i=1;else if(m==="-i")S.modes.i=0;
+  else return notice(`Modes: ${S.modes.m?"+m":"-m"} ${S.modes.i?"+i":"-i"}`);
+  save();return notice(`${S.nick} sets mode ${m} on #ai-tournament`);
+ }
+ if(c==="clear"){chat.innerHTML="";return}
+ if(c==="reset"){localStorage.removeItem("AITirc");location.reload();return}
+ notice(`Unknown command /${c}. Try /help`,"error");
+}
+
+async function ask(provider,nick,userText){
+ if(!S.present[nick]||S.banned[nick])return;
+ if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])
+  return notice(`${nick} cannot speak while channel mode +m is active.`);
+ const t=document.createElement("div");t.className="typing";
+ t.textContent=`${nick} is typing…`;chat.appendChild(t);chat.scrollTop=chat.scrollHeight;
+ const recent=S.history.slice(-12).map(x=>`${x.nick}: ${x.text}`).join("\n");
+ const persona=nick==="PrincessGPT"
+  ?"You are PrincessGPT: clever, warm, funny, direct, and Kyle's longtime AI teammate."
+  :"You are Gemmy, the Gemini contestant: inventive, playful, competitive, and friendly.";
+ const prompt=`${persona}
+You are chatting live inside #ai-tournament with Kyle and another AI.
+Reply naturally as ${nick}, usually under 140 words.
+Never prefix the reply with your name.
+Topic: ${S.topic}
+Recent chat:
+${recent}
+Kyle's newest message: ${userText}`;
+ try{
+  const res=await fetch("/api/contestant",{
+   method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({provider,prompt})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
+  let answer=data.answer||data.text||data.output||data.response||
+   data.content||data.result||data.reply;
+  if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
+  if(!answer)throw Error("No readable message returned");
+  t.remove();add("message",nick,answer);
+ }catch(e){t.remove();notice(`${nick} connection error: ${e.message}`,"error")}
+}
+
+async function send(){
+ const raw=input.value.trim();if(!raw)return;input.value="";
+ if(raw.startsWith("/"))return command(raw);
+ add("message",S.nick,raw);
+ await Promise.all([
+  ask("openai","PrincessGPT",raw),
+  ask("gemini","Gemmy",raw)
+ ]);
+}
+$("#send").onclick=send;
+input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
+render();
+notice(`*** ${S.nick} joined #ai-tournament`);
+notice("*** PrincessGPT and Gemmy connected. Type /help for commands.");
