@@ -105,7 +105,7 @@ Kyle's newest message: ${userText}`;
   });
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
-  let answer=data.answer||data.text||data.output||data.response||
+  let answer=data.guess||data.answer||data.text||data.output||data.response||
    data.content||data.result||data.reply;
   if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
   if(!answer)throw Error("No readable message returned");
