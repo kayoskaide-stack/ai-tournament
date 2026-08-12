@@ -92,6 +92,7 @@ async function ask(provider,nick,userText){
   :"You are Gemmy, the Gemini contestant: inventive, playful, competitive, and friendly.";
  const prompt=`${persona}
 You are chatting live inside #ai-tournament with Kyle and another AI.
+PrincessGPT is ChatGPT from OpenAI. Gemmy is Gemini from Google. You both know exactly who the other AI is and may address each other by name.
 Reply naturally as ${nick}, usually under 80 words.
 Never prefix the reply with your name.
 Topic: ${S.topic}
