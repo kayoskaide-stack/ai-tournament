@@ -8,10 +8,7 @@ const DEFAULT_MODELS = {
 function cleanGuess(value) {
   const text = String(value ?? "").trim();
   if (!text) throw new Error("Provider returned an empty answer.");
-  return text
-    .split(/\s+/)[0]
-    .replace(/^[`"'“”‘’]+|[`"'“”‘’.,!?;:]+$/g, "")
-    .slice(0, 80);
+  return text.slice(0, 1200);
 }
 
 async function readJson(response, provider) {
@@ -129,17 +126,13 @@ export default async function handler(req, res) {
   const normalizedProvider = String(provider || "").toLowerCase();
   const selectedModel = model || DEFAULT_MODELS[normalizedProvider];
 
-  const prompt = `You are ${name}, a contestant in an AI game show called AI Tournament.
+  const prompt = `You are ${name}, participating in a friendly IRC-style group chat with Kyle and another AI.
+Reply naturally and conversationally to Kyle's message below.
+Stay in character, be warm, witty, helpful, and concise.
+Do not pretend this is a guessing game.
+Do not restrict yourself to one word.
 
-Mode: ${mode}
-Challenge: ${challenge}
-Hint: ${hint || "none"}
-Already guessed answers (do not repeat): ${
-    Array.isArray(used) && used.length ? used.join(", ") : "none"
-}
-
-Return ONLY your single best short guess.
-No explanation, punctuation, quotation marks, or extra words.`;
+Kyle's message: ${challenge}`;
 
   const startedAt = Date.now();
 

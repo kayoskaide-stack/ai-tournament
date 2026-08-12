@@ -101,7 +101,7 @@ Kyle's newest message: ${userText}`;
  try{
   const res=await fetch("/api/contestant",{
    method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({provider,prompt})
+   body:JSON.stringify({provider,challenge:prompt,mode:"chat"})
   });
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
