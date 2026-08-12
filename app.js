@@ -6,6 +6,7 @@ let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
 };
 S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,radioVoices:true,exchanges:2},S.settings||{});
 let pendingImage="";
+let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const time=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
@@ -148,19 +149,19 @@ Kyle's newest message: ${userText}`;
  }catch(e){t.remove();notice(`${nick} connection error: ${e.message}`,"error")}
 }
 
-async function send(){
-  const raw=input.value.trim();if(!raw)return;input.value="";
+async function send(spokenText=""){
+  const raw=String(spokenText||input.value).trim();if(!raw)return;input.value="";
   if(raw.startsWith("/"))return command(raw);
   add("message",S.nick,raw);const image=pendingImage;pendingImage="";$("#photoBtn").textContent="📎";
   if(image){const box=document.createElement("div");box.className="attachment";box.innerHTML=`<img src="${image}" alt="Kyle's uploaded picture">`;chat.appendChild(box);chat.scrollTop=chat.scrollHeight}
-  const button=$("#send");button.disabled=true;
+  const button=$("#send");button.disabled=true;arenaBusy=true;
   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   try{
     const princess=await ask("openai","PrincessGPT",raw,image);
     await pause(1200);
     let last=await ask("gemini","Gemmy",`Kyle said: ${raw}\nPrincessGPT proposed: ${princess||"(no reply)"}. Address PrincessGPT by name. Challenge or improve one concrete point; do not simply agree.`,image);
     if(S.settings.autoTalk){for(let round=1;round<Number(S.settings.exchanges);round++){await pause(1200);last=await ask("openai","PrincessGPT",`Gemmy replied: ${last||"(no reply)"}. Address Gemmy directly. Defend, revise, or replace the proposal with concrete reasoning.`,image);await pause(1200);last=await ask("gemini","Gemmy",`PrincessGPT replied: ${last||"(no reply)"}. Give a concise final critique or agreement with a specific reason, then return control to Kyle.`,image)}}
-  }finally{button.disabled=false;input.focus()}
+  }finally{button.disabled=false;arenaBusy=false;input.focus();if(liveWanted)setTimeout(startLiveListening,500)}
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
@@ -168,6 +169,30 @@ const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","aut
 const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
 $("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
 $("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);save();closeSettings();notice("Arena settings saved. 🤓❤️🌧️⚔️")};
+function liveLabel(text,on=false){const b=$("#liveBtn");b.textContent=text;b.classList.toggle("liveOn",on)}
+function stopLiveHardware(){cancelAnimationFrame(liveFrame);liveFrame=0;if(liveRecorder&&liveRecorder.state!=="inactive")liveRecorder.stop();if(liveStream)liveStream.getTracks().forEach(t=>t.stop());liveRecorder=null;liveStream=null;if(liveMeter)liveMeter.close().catch(()=>{});liveMeter=null}
+async function transcribeLive(blob){
+ liveLabel("⏳ HEARING…",true);
+ const bytes=new Uint8Array(await blob.arrayBuffer());let binary="";for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+ const res=await fetch("/api/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio:btoa(binary),mime:blob.type||"audio/mp4"})});
+ const data=await res.json().catch(()=>({}));if(!res.ok)throw Error(data.error||`Transcription HTTP ${res.status}`);return String(data.text||"").trim();
+}
+async function finishLiveTurn(){
+ if(!liveRecorder||liveRecorder.state==="inactive")return;const recorder=liveRecorder;
+ recorder.onstop=async()=>{const blob=new Blob(liveChunks,{type:recorder.mimeType||"audio/mp4"});stopLiveHardware();if(!liveWanted)return;try{const words=await transcribeLive(blob);if(words){liveLabel("📻 AIs TALKING",true);await send(words)}else startLiveListening()}catch(e){notice(`🎙 Live mode error: ${e.message}`,"error");liveWanted=false;liveLabel("🎙 LIVE")}};
+ recorder.stop();
+}
+async function startLiveListening(){
+ if(!liveWanted||arenaBusy||liveRecorder)return;
+ try{
+  liveStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  liveChunks=[];liveRecorder=new MediaRecorder(liveStream);liveRecorder.ondataavailable=e=>{if(e.data.size)liveChunks.push(e.data)};liveRecorder.start(250);
+  liveMeter=new (window.AudioContext||window.webkitAudioContext)();const src=liveMeter.createMediaStreamSource(liveStream),an=liveMeter.createAnalyser();an.fftSize=512;src.connect(an);const levels=new Uint8Array(an.fftSize);liveStarted=performance.now();liveSpeaking=false;liveLastVoice=liveStarted;liveLabel("🔴 LISTENING",true);
+  const watch=()=>{if(!liveWanted||!liveRecorder)return;an.getByteTimeDomainData(levels);let sum=0;for(const v of levels){const x=(v-128)/128;sum+=x*x}const rms=Math.sqrt(sum/levels.length),now=performance.now();if(rms>.035){liveSpeaking=true;liveLastVoice=now;liveLabel("🟢 HEARING YOU",true)}else if(liveSpeaking&&now-liveLastVoice>1100){finishLiveTurn();return}else if(!liveSpeaking&&now-liveStarted>30000){liveStarted=now}liveFrame=requestAnimationFrame(watch)};watch();
+ }catch(e){liveWanted=false;stopLiveHardware();liveLabel("🎙 LIVE");notice(`Microphone unavailable: ${e.message}`,"error")}
+}
+$("#liveBtn").onclick=()=>{liveWanted=!liveWanted;if(liveWanted){notice("🎙 LIVE mode on — talk naturally, then pause.");startLiveListening()}else{stopLiveHardware();liveLabel("🎙 LIVE");notice("🎙 LIVE mode off.")}};
+
 $("#auditionPrincess").onclick=()=>radioSpeak("PrincessGPT","Hello Kyle. PrincessGPT is on the air, coming through loud and clear.",true);
 $("#auditionGemmy").onclick=()=>radioSpeak("Gemmy","Hello Kyle. Gemmy is back from England and reporting live from the arena.",true);
 $("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>12e6)return notice("Picture is too large; choose one under 12 MB.","error");const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext("2d").drawImage(img,0,0,c.width,c.height);pendingImage=c.toDataURL("image/jpeg",.8);URL.revokeObjectURL(url);$("#photoBtn").textContent="📎✓";notice("Picture attached. Both AIs will receive it when you press Send.")};img.src=url};

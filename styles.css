@@ -50,3 +50,5 @@ button{background:#17314b;border:1px solid #315a7e;border-radius:6px;
 }
 
 .voiceAuditions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.voiceAuditions button{min-height:44px;padding:8px;font-size:12px}
+
+#liveBtn{font-size:15px;min-width:94px;padding:0 10px;background:#5b1830;border-color:#c8456c}#liveBtn.liveOn{background:#b20f3d;box-shadow:0 0 14px #ff365f}
