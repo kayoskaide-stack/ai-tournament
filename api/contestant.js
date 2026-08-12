@@ -1,6 +1,6 @@
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
-  gemini: "gemini-2.5-flash",
+  gemini: "gemini-3-flash-preview",
   anthropic: "claude-3-5-haiku-latest",
   xai: "grok-4.5",
 };
@@ -51,7 +51,7 @@ async function callOpenAICompatible({ key, model, prompt, baseUrl, provider }) {
       model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
-      max_tokens: 20,
+      max_tokens: 200,
     }),
   });
 
@@ -76,7 +76,7 @@ async function callGemini({ key, model, prompt }) {
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 20,
+        maxOutputTokens: 200,
       },
     }),
   });
@@ -97,7 +97,7 @@ async function callClaude({ key, model, prompt }) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 20,
+      max_tokens: 200,
       temperature: 0.2,
       messages: [{ role: "user", content: prompt }],
     }),
