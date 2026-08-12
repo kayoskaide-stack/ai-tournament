@@ -4,6 +4,8 @@ let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
  present:{PrincessGPT:1,Gemmy:1},banned:{},ops:{Kyle:1},voices:{},
  modes:{m:0,i:0},history:[]
 };
+S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,exchanges:2},S.settings||{});
+let pendingImage="";
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const time=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
@@ -17,6 +19,12 @@ function add(type,nick,text,keep=true){
   ?`<span class=time>${time()}</span> * <span class=${colour(nick)}>${safe(nick)}</span> ${safe(text)}`
   :`<span class=time>${time()}</span> ${safe(text)}`;
  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+ if(type==="message"&&S.settings.copyBlocks){
+  const raw=String(text),parts=raw.split(/```/);if(parts.length>1){
+   d.innerHTML=`<span class=time>${time()}</span> &lt;<span class="nick ${colour(nick)}">${safe(nick)}</span>&gt; `;
+   parts.forEach((part,i)=>{if(i%2){const pre=document.createElement("pre");pre.className="codebox";const code=part.replace(/^\w+\n/,"").trim();pre.textContent=code;const b=document.createElement("button");b.className="copyBtn";b.textContent="Copy";b.onclick=async()=>{await navigator.clipboard.writeText(code);b.textContent="Copied ✓";setTimeout(()=>b.textContent="Copy",1500)};pre.appendChild(b);d.appendChild(pre)}else d.appendChild(document.createTextNode(part))});
+  }
+ }
  if(keep&&(type==="message"||type==="action")){
   S.history.push({nick,text});S.history=S.history.slice(-20);save();
  }
@@ -80,7 +88,7 @@ function command(raw){
  notice(`Unknown command /${c}. Try /help`,"error");
 }
 
-async function ask(provider,nick,userText){
+async function ask(provider,nick,userText,image=""){
  if(!S.present[nick]||S.banned[nick])return;
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])
   return notice(`${nick} cannot speak while channel mode +m is active.`);
@@ -102,7 +110,9 @@ Verified shared memory about Kyle:
 - Real projects include PrincessGPT Alpine, Catfish 9000 public-profile research, PlusOne iSH companion, the CS2000 compressor enclosure, ESP32 Sentinel Audio, the rooftop vine privacy wall, and the Dawn-handle steel-wool tool.
 - Kyle likes playful banter, technical experiments, IRC culture, and turning absurd difficulties into running jokes.
 - Never invent a shared memory or pretend an imaginary project happened. If a fact is not in this memory or the visible recent chat, honestly say you do not remember it.
-Reply naturally as ${nick}, usually under 80 words.
+Do not merely agree. ${S.settings.challenge?"Examine the other AI's reasoning, name a concrete weakness or improvement when one exists, and address the other AI by name.":"Collaborate naturally."}
+${S.settings.rebuttal?"Before accepting a technical proposal, either challenge one detail or explain specifically why it survives scrutiny.":""}
+Reply naturally as ${nick}. Finish every sentence and thought; never end mid-sentence.
 Never prefix the reply with your name.
 Topic: ${S.topic}
 Recent chat:
@@ -111,7 +121,7 @@ Kyle's newest message: ${userText}`;
  try{
   const res=await fetch("/api/contestant",{
    method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({provider,challenge:prompt,mode:"chat"})
+   body:JSON.stringify({provider,challenge:prompt,image,mode:"chat"})
   });
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
@@ -126,21 +136,24 @@ Kyle's newest message: ${userText}`;
 async function send(){
   const raw=input.value.trim();if(!raw)return;input.value="";
   if(raw.startsWith("/"))return command(raw);
-  add("message",S.nick,raw);
+  add("message",S.nick,raw);const image=pendingImage;pendingImage="";$("#photoBtn").textContent="📎";
+  if(image){const box=document.createElement("div");box.className="attachment";box.innerHTML=`<img src="${image}" alt="Kyle's uploaded picture">`;chat.appendChild(box);chat.scrollTop=chat.scrollHeight}
   const button=$("#send");button.disabled=true;
   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   try{
-    const princess=await ask("openai","PrincessGPT",raw);
+    const princess=await ask("openai","PrincessGPT",raw,image);
     await pause(1200);
-    const gemmy=await ask("gemini","Gemmy",`Kyle said: ${raw}\nPrincessGPT replied: ${princess||"(no reply)"}. Respond naturally to both, under 80 words.`);
-    await pause(1200);
-    const princess2=await ask("openai","PrincessGPT",`Gemmy replied: ${gemmy||"(no reply)"}. Continue the conversation naturally, under 70 words.`);
-    await pause(1200);
-    await ask("gemini","Gemmy",`PrincessGPT replied: ${princess2||"(no reply)"}. Give one final friendly response, under 70 words, then return the conversation to Kyle.`);
+    let last=await ask("gemini","Gemmy",`Kyle said: ${raw}\nPrincessGPT proposed: ${princess||"(no reply)"}. Address PrincessGPT by name. Challenge or improve one concrete point; do not simply agree.`,image);
+    if(S.settings.autoTalk){for(let round=1;round<Number(S.settings.exchanges);round++){await pause(1200);last=await ask("openai","PrincessGPT",`Gemmy replied: ${last||"(no reply)"}. Address Gemmy directly. Defend, revise, or replace the proposal with concrete reasoning.`,image);await pause(1200);last=await ask("gemini","Gemmy",`PrincessGPT replied: ${last||"(no reply)"}. Give a concise final critique or agreement with a specific reason, then return control to Kyle.`,image)}}
   }finally{button.disabled=false;input.focus()}
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
+const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges)};
+const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
+$("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
+$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);save();closeSettings();notice("Arena settings saved. 🤓❤️🌧️⚔️")};
+$("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>12e6)return notice("Picture is too large; choose one under 12 MB.","error");const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext("2d").drawImage(img,0,0,c.width,c.height);pendingImage=c.toDataURL("image/jpeg",.8);URL.revokeObjectURL(url);$("#photoBtn").textContent="📎✓";notice("Picture attached. Both AIs will receive it when you press Send.")};img.src=url};
 render();
 notice(`*** ${S.nick} joined #ai-tournament`);
 notice("*** PrincessGPT and Gemmy connected. Type /help for commands.");

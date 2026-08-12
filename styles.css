@@ -11,6 +11,7 @@ body{overflow:hidden}
 header{background:#0d141d;border-bottom:1px solid var(--line);
  padding:max(10px,env(safe-area-inset-top)) 11px 10px}
 .heading{display:flex;align-items:center;gap:9px}
+.heading #settingsBtn{margin-left:auto;background:transparent;border:0;font-size:20px;padding:4px 8px}
 .heading i{width:10px;height:10px;border-radius:50%;background:var(--green);
  box-shadow:0 0 12px var(--green)}
 .heading b{color:white}
@@ -40,6 +41,8 @@ input{min-width:0;flex:1;background:#05090d;border:1px solid #35495a;
  border-radius:6px;color:white;font:16px Menlo,monospace;padding:12px}
 button{background:#17314b;border:1px solid #315a7e;border-radius:6px;
  color:white;font-weight:bold;padding:0 15px}
+#photoBtn{font-size:22px;padding:0 12px}.attachment{border:1px solid #315a7e;border-radius:8px;padding:7px;margin:5px 0;max-width:280px}.attachment img{display:block;width:100%;border-radius:5px}.codebox{position:relative;background:#101820;border:1px solid #35495a;border-radius:7px;margin:7px 0;padding:32px 9px 9px;white-space:pre-wrap;overflow:auto}.copyBtn{position:absolute;right:5px;top:5px;padding:5px 9px;font-size:11px}.copied{color:var(--green)}
+#shade{position:fixed;inset:0;background:#000a;z-index:5}#settings{position:fixed;z-index:6;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));background:#101720;border:1px solid #42627d;border-radius:12px;padding:14px;box-shadow:0 0 30px #000;max-width:480px;margin:auto}.settingsHead{display:flex;justify-content:space-between;align-items:center;color:var(--gold);margin-bottom:12px}.settingsHead button{font-size:24px;padding:0 9px}#settings label{display:flex;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid #293745;font-size:13px}#settings label input{flex:0;width:22px;height:22px}#settings select{margin-left:auto;font-size:16px;background:#071019;color:white;padding:5px}#saveSettings{width:100%;padding:12px;margin-top:14px}
 @media(max-width:420px){
  .main{grid-template-columns:1fr 102px}
  aside{padding-left:5px;padding-right:4px}

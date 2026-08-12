@@ -9,7 +9,7 @@
 <body>
 <div class="app">
 <header>
-  <div class="heading"><i></i><b>#ai-tournament</b><small>LIVE</small></div>
+  <div class="heading"><i></i><b>#ai-tournament</b><small>LIVE</small><button id="settingsBtn" aria-label="Open settings">⚙️</button></div>
   <div id="topic">Topic: Kyle, PrincessGPT and Gemmy enter the arena.</div>
 </header>
 
@@ -22,10 +22,12 @@
 </div>
 
 <footer>
+  <button id="photoBtn" aria-label="Upload picture">📎</button><input id="photo" type="file" accept="image/*" hidden>
   <input id="input" autocomplete="off" placeholder="Message #ai-tournament or /help">
   <button id="send">Send</button>
 </footer>
 </div>
+<div id="shade" hidden></div><section id="settings" hidden><div class="settingsHead"><b>⚙️ ARENA SETTINGS</b><button id="closeSettings">×</button></div><label><input id="copyBlocks" type="checkbox"> Copy buttons on code blocks</label><label><input id="challenge" type="checkbox"> AIs challenge each other</label><label><input id="rebuttal" type="checkbox"> Require rebuttal before agreement</label><label><input id="autoTalk" type="checkbox"> Continue automatically</label><label>AI exchanges <select id="exchanges"><option>1</option><option>2</option><option>3</option></select></label><button id="saveSettings">Save settings</button></section>
 <script src="/app.js"></script>
 </body>
 </html>

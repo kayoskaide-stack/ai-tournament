@@ -8,7 +8,7 @@ const DEFAULT_MODELS = {
 function cleanGuess(value) {
   const text = String(value ?? "").trim();
   if (!text) throw new Error("Provider returned an empty answer.");
-  return text.slice(0, 1200);
+  return text;
 }
 
 async function readJson(response, provider) {
@@ -37,7 +37,7 @@ async function readJson(response, provider) {
   return data;
 }
 
-async function callOpenAICompatible({ key, model, prompt, baseUrl, provider }) {
+async function callOpenAICompatible({ key, model, prompt, image, baseUrl, provider }) {
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -46,7 +46,7 @@ async function callOpenAICompatible({ key, model, prompt, baseUrl, provider }) {
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: image ? [{type:"text",text:prompt},{type:"image_url",image_url:{url:image}}] : prompt }],
       temperature: 0.2,
       max_tokens: 700,
     }),
@@ -56,7 +56,7 @@ async function callOpenAICompatible({ key, model, prompt, baseUrl, provider }) {
   return data?.choices?.[0]?.message?.content;
 }
 
-async function callGemini({ key, model, prompt }) {
+async function callGemini({ key, model, prompt, image }) {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/` +
     `${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
@@ -68,7 +68,7 @@ async function callGemini({ key, model, prompt }) {
       contents: [
         {
           role: "user",
-          parts: [{ text: prompt }],
+          parts: [{ text: prompt },...(image?[{inline_data:{mime_type:(image.match(/^data:([^;]+)/)||[])[1]||"image/jpeg",data:image.split(",")[1]}}]:[])],
         },
       ],
       generationConfig: {
@@ -119,6 +119,7 @@ export default async function handler(req, res) {
     model,
     mode = "autocorrect",
     challenge = "",
+    image = "",
     hint = "",
     used = [],
   } = req.body || {};
@@ -148,6 +149,7 @@ Kyle's message: ${challenge}`;
         key: process.env.OPENAI_API_KEY,
         model: selectedModel,
         prompt,
+        image,
         baseUrl: "https://api.openai.com/v1",
         provider: "OpenAI",
       });
@@ -160,6 +162,7 @@ Kyle's message: ${challenge}`;
         key: process.env.GEMINI_API_KEY,
         model: selectedModel,
         prompt,
+        image,
       });
     } else if (normalizedProvider === "anthropic") {
       if (!process.env.ANTHROPIC_API_KEY) {
