@@ -48,3 +48,5 @@ button{background:#17314b;border:1px solid #315a7e;border-radius:6px;
  aside{padding-left:5px;padding-right:4px}
  .user{font-size:10px}
 }
+
+.voiceAuditions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.voiceAuditions button{min-height:44px;padding:8px;font-size:12px}

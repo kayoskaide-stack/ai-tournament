@@ -4,7 +4,7 @@ let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
  present:{PrincessGPT:1,Gemmy:1},banned:{},ops:{Kyle:1},voices:{},
  modes:{m:0,i:0},history:[]
 };
-S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,exchanges:2},S.settings||{});
+S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,radioVoices:true,exchanges:2},S.settings||{});
 let pendingImage="";
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -88,6 +88,21 @@ function command(raw){
  notice(`Unknown command /${c}. Try /help`,"error");
 }
 
+let radioQueue=Promise.resolve();
+async function radioSpeak(nick,text,force=false){
+ if(!force&&!S.settings.radioVoices)return;
+ const provider=nick==="PrincessGPT"?"openai":"gemini";
+ radioQueue=radioQueue.then(async()=>{
+  const res=await fetch("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider,text:String(text).slice(0,4000)})});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.error||`Voice HTTP ${res.status}`);
+  const audio=new Audio(`data:${data.mime};base64,${data.audio}`);
+  await audio.play();
+  await new Promise(resolve=>{audio.onended=resolve;audio.onerror=resolve});
+ }).catch(e=>notice(`📻 ${nick} voice error: ${e.message}`,"error"));
+ return radioQueue;
+}
+
 async function ask(provider,nick,userText,image=""){
  if(!S.present[nick]||S.banned[nick])return;
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])
@@ -129,7 +144,7 @@ Kyle's newest message: ${userText}`;
    data.content||data.result||data.reply;
   if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
   if(!answer)throw Error("No readable message returned");
-  t.remove();add("message",nick,answer);return answer;
+  t.remove();add("message",nick,answer);await radioSpeak(nick,answer);return answer;
  }catch(e){t.remove();notice(`${nick} connection error: ${e.message}`,"error")}
 }
 
@@ -149,10 +164,12 @@ async function send(){
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
-const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges)};
+const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges)};
 const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
 $("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
-$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);save();closeSettings();notice("Arena settings saved. 🤓❤️🌧️⚔️")};
+$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);save();closeSettings();notice("Arena settings saved. 🤓❤️🌧️⚔️")};
+$("#auditionPrincess").onclick=()=>radioSpeak("PrincessGPT","Hello Kyle. PrincessGPT is on the air, coming through loud and clear.",true);
+$("#auditionGemmy").onclick=()=>radioSpeak("Gemmy","Hello Kyle. Gemmy is back from England and reporting live from the arena.",true);
 $("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>12e6)return notice("Picture is too large; choose one under 12 MB.","error");const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext("2d").drawImage(img,0,0,c.width,c.height);pendingImage=c.toDataURL("image/jpeg",.8);URL.revokeObjectURL(url);$("#photoBtn").textContent="📎✓";notice("Picture attached. Both AIs will receive it when you press Send.")};img.src=url};
 render();
 notice(`*** ${S.nick} joined #ai-tournament`);
