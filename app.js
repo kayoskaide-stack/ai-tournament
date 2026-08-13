@@ -13,13 +13,17 @@ S.profiles=S.profiles||{};
 S.profiles.openai=Object.assign({},profileDefaults,{model:S.settings.openaiModel||"gpt-5.6-terra",plan:S.settings.openaiPlan||"auto"},S.profiles.openai||{});
 S.profiles.gemini=Object.assign({},profileDefaults,{mood:"playful",model:S.settings.geminiModel||"gemini-3.6-flash",plan:S.settings.geminiPlan||"auto"},S.profiles.gemini||{});
 S.workspace=Object.assign({channel:"ai-tournament",projects:{},ascii:{},skin:"midnight",logs:{}},S.workspace||{});
+S.admin=Object.assign({owner:"Kyle",humanPace:true,replyDelay:8,maxReplies:2},S.admin||{});
+S.roster=S.roster||{};
+for(const [provider,nick] of [["openai","PrincessGPT"],["gemini","Gemmy"]])S.roster[provider]=Object.assign({nick,state:"present",charLimit:700,partReason:"Out for lunch in the cloud."},S.roster[provider]||{});
+S.specialists=Object.assign({coding:{nick:"CodeSavant",enabled:true,status:"ready",provider:"openai"},descript:{nick:"Underlord",enabled:false,status:"API setup required",provider:"descript"},shopping:{nick:"ShopScout",enabled:false,status:"No Rufus public API",provider:"shopping"}},S.specialists||{});
 let providerReady={openai:true,gemini:true};
 let pendingImages=[];
 let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const time=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-const colour=n=>n===S.nick?"kyle":n==="PrincessGPT"?"princess":"gemmy";
+const colour=n=>n===S.nick?"kyle":n===S.roster.openai.nick?"princess":"gemmy";
 const mircColours=["#fff","#000","#00007f","#009300","#ff0000","#7f0000","#9c009c","#fc7f00","#ffff00","#00fc00","#009393","#00ffff","#0000fc","#ff00ff","#7f7f7f","#d2d2d2"];
 
 function add(type,nick,text,keep=true){
@@ -52,8 +56,10 @@ function name(x){
  if(["gemmy","gemini","gem"].includes(x))return"Gemmy";
  if(x==="kyle"||x===S.nick.toLowerCase())return S.nick;
 }
+function rosterNick(provider){const r=S.roster[provider];return r.state==="afk"?`${r.nick}-AFK`:r.nick}
+function active(provider){return ["present","quiet","mention"].includes(S.roster[provider].state)}
 function render(){
- let a=[S.nick,...["PrincessGPT","Gemmy"].filter(n=>S.present[n])];
+ let a=[S.nick,...["openai","gemini"].filter(active).map(rosterNick)];
  $("#users").innerHTML=a.map(n=>`<div class="user ${colour(n)}">${S.ops[n]?"@":S.voices[n]?"+":""}${safe(n)}</div>`).join("");
  $("#count").textContent=a.length;
  $("#topic").textContent="Topic: "+S.topic;
@@ -130,7 +136,9 @@ async function radioSpeak(nick,text,force=false){
 }
 
 async function ask(provider,nick,userText,images=[]){
- if(!S.present[nick]||S.banned[nick])return;
+ const roster=S.roster[provider];if(nick==="PrincessGPT"||nick==="Gemmy"||nick===roster.nick)nick=roster.nick;
+ if(!active(provider)||S.banned[nick])return;
+ if(["quiet","mention"].includes(roster.state)&&!String(userText).toLowerCase().includes(roster.nick.toLowerCase()))return;
  const profile=S.profiles[provider]||profileDefaults,plan=profile.plan||"auto";
  if(plan==="off"||!providerReady[provider])return;
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])
@@ -138,7 +146,7 @@ async function ask(provider,nick,userText,images=[]){
  const t=document.createElement("div");t.className="typing";
  t.textContent=`${nick} is typing…`;chat.appendChild(t);chat.scrollTop=chat.scrollHeight;
  const recent=S.history.slice(-12).map(x=>`${x.nick}: ${x.text}`).join("\n");
- const persona=nick==="PrincessGPT"
+ const persona=provider==="openai"
   ?"You are PrincessGPT: clever, warm, funny, direct, and Kyle's longtime AI teammate."
   :"You are Gemmy, the Gemini contestant: inventive, playful, competitive, and friendly.";
  const prompt=`${persona}
@@ -159,7 +167,7 @@ Your configured mood is ${profile.mood}. Friendliness ${profile.friendliness}/10
 Use comedy at the configured intensity, but never become cruel, threatening, or personally insulting. Critique answers, never the human. ${profile.custom?`Additional operator direction: ${profile.custom}`:""}
 Reply language: ${profile.language==="auto"?"match Kyle's language":profile.language}.
 Reply naturally as ${nick}. Finish every sentence and thought; never end mid-sentence.
-${profile.length==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":profile.length==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."}
+${profile.length==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":profile.length==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."} Hard limit: ${roster.charLimit} characters.
 Never prefix the reply with your name.
 Topic: ${S.topic}
 Recent chat:
@@ -176,7 +184,7 @@ Kyle's newest message: ${userText}`;
    data.content||data.result||data.reply;
   if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
   if(!answer)throw Error("No readable message returned");
-  t.remove();add("message",nick,answer);await radioSpeak(nick,answer);return answer;
+  answer=String(answer).slice(0,Math.max(80,Number(roster.charLimit)||700));t.remove();add("message",nick,answer);if(nick===roster.nick)await radioSpeak(nick,answer);return answer;
  }catch(e){t.remove();providerReady[provider]=false;compactError(nick,e.message);renderProviderStatus()}
 }
 
@@ -184,6 +192,9 @@ async function send(spokenText=""){
   const raw=String(spokenText||input.value).trim();if(!raw&&!pendingImages.length)return;input.value="";
   if(raw.startsWith("!catchup")||raw.startsWith("!reingest")){const log=S.workspace.logs[S.workspace.channel]||[],n=raw.includes("full")?log.length:Math.min(40,log.length),digest=log.slice(-n).map(x=>`${x.nick}: ${x.text}`).join("\n");return send(`Project catch-up from the last ${n} logged messages:\n${digest}`)}
   if(raw.startsWith("!really?")){const log=S.workspace.logs[S.workspace.channel]||[],last=[...log].reverse().find(x=>x.nick!==S.nick);return send(`FACT-CHECK COURT: Independently review this last participant statement. Identify claims as confirmed, likely, uncertain, suspected hallucination, or demonstrably false. Give a short reason. Do not kick anyone automatically. Statement by ${last?.nick||"unknown"}: ${last?.text||"No prior statement."}`)}
+  if(raw==="!specialists"){Object.entries(S.specialists).forEach(([k,v])=>notice(`${v.enabled?"●":"○"} ${k} — ${v.nick}: ${v.status}`));return}
+  if(raw.startsWith("!call ")){const [,kind,...words]=raw.split(/\s+/),sp=S.specialists[kind];if(!sp)return notice("Unknown specialist. Type !specialists","error");if(!sp.enabled)return notice(`${sp.nick} unavailable — ${sp.status}. No credits used.`,"error");notice(`*** ${sp.nick} joined #${S.workspace.channel} (specialist: ${kind})`);const result=await ask(sp.provider,sp.nick,`You are the summoned ${kind} specialist. Work only on this task and report a concrete result: ${words.join(" ")}`,[]);notice(`*** ${sp.nick} left #${S.workspace.channel} (${result?"assignment complete":"no supported connection"})`);return}
+  if(raw.startsWith("!log")||raw.startsWith("!export")){const kind=raw.includes("json")?"json":"txt",rows=S.workspace.logs[S.workspace.channel]||[],body=kind==="json"?JSON.stringify(rows,null,2):rows.map(x=>`[${x.at}] <${x.nick}> ${x.text}`).join("\n"),blob=new Blob([body],{type:kind==="json"?"application/json":"text/plain"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${S.workspace.channel}-log.${kind}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice(`Log download prepared: ${a.download}`);return}
   if(raw.startsWith("/"))return command(raw);
   const images=pendingImages.slice(),requestText=raw||`Please examine these ${images.length} picture${images.length==1?"":"s"}.`;
   add("message",S.nick,raw||`📷 ${images.length} picture${images.length==1?"":"s"}`);pendingImages=[];renderPhotoTray();
@@ -191,9 +202,10 @@ async function send(spokenText=""){
   const button=$("#send");button.disabled=true;arenaBusy=true;
   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   try{
-    const princess=await ask("openai","PrincessGPT",requestText,images);
-    await pause(1200);
-    let last=await ask("gemini","Gemmy",`Kyle said: ${requestText}\nPrincessGPT proposed: ${princess||"(no reply)"}. Address PrincessGPT by name. Challenge or improve one concrete point; do not simply agree.`,images);
+    const delay=S.admin.humanPace?Number(S.admin.replyDelay)*1000:1200;
+    const princess=await ask("openai",S.roster.openai.nick,requestText,images);
+    await pause(delay);
+    let last=S.admin.maxReplies>1?await ask("gemini",S.roster.gemini.nick,`Kyle said: ${requestText}\nPrincessGPT proposed: ${princess||"(no reply)"}. Address PrincessGPT by name. Challenge or improve one concrete point; do not simply agree.`,images):"";
     if(S.settings.autoTalk){for(let round=1;round<Number(S.settings.exchanges);round++){await pause(1200);last=await ask("openai","PrincessGPT",`Gemmy replied: ${last||"(no reply)"}. Address Gemmy directly. Defend, revise, or replace the proposal with concrete reasoning.`,[]);await pause(1200);last=await ask("gemini","Gemmy",`PrincessGPT replied: ${last||"(no reply)"}. Give a concise final critique or agreement with a specific reason, then return control to Kyle.`,[])}}
   }finally{button.disabled=false;arenaBusy=false;input.focus();if(liveWanted)setTimeout(startLiveListening,500)}
 }
@@ -202,12 +214,14 @@ input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
 const modelOptions={openai:[["gpt-5.6-sol","5.6 Sol — flagship"],["gpt-5.6-terra","5.6 Terra — balanced"],["gpt-5.6-luna","5.6 Luna — light/economy"],["gpt-4o-mini","4o Mini — legacy economy"]],gemini:[["gemini-3.6-flash","Gemini 3.6 Flash"],["gemini-3.5-flash-lite","Gemini 3.5 Flash-Lite"],["gemini-3.1-pro-preview","Gemini 3.1 Pro Preview"],["gemini-3-flash-preview","Gemini 3 Flash Preview"]]};
 const selectHtml=(key,items,value)=>`<select data-key="${key}">${items.map(([v,n])=>`<option value="${v}" ${v===String(value)?"selected":""}>${n}</option>`).join("")}</select>`;
 function renderProfileControls(){for(const provider of ["openai","gemini"]){const p=S.profiles[provider],el=$("#"+provider+"Controls"),range=k=>`<label>${k[0].toUpperCase()+k.slice(1)} <input data-key="${k}" type="range" min="0" max="10" value="${p[k]}"><output>${p[k]}</output></label>`;el.innerHTML=`<div class="controlHint">Every value below belongs only to this contestant.</div><div class="panelPreset"><button type="button" data-preset="friendly">😊 Friendly</button><button type="button" data-preset="chaos">🤪 Comedy chaos</button><button type="button" data-preset="debate">⚔️ Fierce debate</button><button type="button" data-preset="reset">↺ Reset</button></div><label>Service ${selectHtml("plan",[["auto","Auto-detect"],["paid","Paid/API credits"],["free","Free/limited"],["off","Sit out"]],p.plan)}</label><label>Language model ${selectHtml("model",modelOptions[provider],p.model)}</label><label>Reasoning ${selectHtml("reasoning",[["none","Instant/none"],["low","Light"],["medium","Smart"],["high","Deep"],["xhigh","Expert"],["max","Maximum"]],p.reasoning)}</label><label>Mood ${selectHtml("mood",[["friendly","Friendly"],["playful","Playful"],["neutral","Neutral"],["unfriendly","Unfriendly"],["annoyed","Annoyed"],["mad","Mad"],["super-pissed","Super pissed — still safe/comical"]],p.mood)}</label><label>Reply length ${selectHtml("length",[["tiny","Very short"],["short","Short"],["normal","Normal"]],p.length)}</label><label>Language ${selectHtml("language",[["auto","Match user"],["English","English"],["French","French"],["Spanish","Spanish"]],p.language)}</label>${["friendliness","humour","banter","competition","critique","initiative","character"].map(range).join("")}<label class="directionLabel">Special direction</label><textarea class="customDirection" data-key="custom" placeholder="Optional custom behaviour…">${safe(p.custom)}</textarea>`;el.querySelectorAll("input[type=range]").forEach(x=>x.oninput=()=>x.nextElementSibling.textContent=x.value);el.querySelectorAll("[data-preset]").forEach(b=>b.onclick=()=>applyProfilePreset(provider,b.dataset.preset))}}
-function readProfileControls(){for(const provider of ["openai","gemini"]){$("#"+provider+"Controls").querySelectorAll("[data-key]").forEach(x=>S.profiles[provider][x.dataset.key]=x.type==="range"?Number(x.value):x.value)}}
+const renderPersonalityControls=renderProfileControls;
+renderProfileControls=function(){renderPersonalityControls();for(const provider of ["openai","gemini"]){const r=S.roster[provider],el=$("#"+provider+"Controls"),box=document.createElement("div");box.className="rosterControls";box.innerHTML=`<label>Nickname <input data-roster="nick" value="${safe(r.nick)}" maxlength="24"></label><label>Presence ${selectHtml("state",[["present","Present"],["quiet","Quiet"],["mention","Mention only"],["afk","AFK"],["paused","Paused"],["parted","Parted"],["offline","Offline"]],r.state).replace("data-key","data-roster")}</label><label>Character cap <input data-roster="charLimit" type="number" min="80" max="4000" value="${r.charLimit}"></label><label>PART/QUIT reason <input data-roster="partReason" value="${safe(r.partReason)}"></label>`;el.prepend(box)}};
+function readProfileControls(){for(const provider of ["openai","gemini"]){$("#"+provider+"Controls").querySelectorAll("[data-key]").forEach(x=>S.profiles[provider][x.dataset.key]=x.type==="range"?Number(x.value):x.value);$("#"+provider+"Controls").querySelectorAll("[data-roster]").forEach(x=>S.roster[provider][x.dataset.roster]=x.type==="number"?Number(x.value):x.value)}}
 function applyProfilePreset(provider,preset){readProfileControls();const p=S.profiles[provider],sets={friendly:{mood:"friendly",friendliness:10,humour:6,banter:4,competition:3,critique:4,initiative:6,character:9},chaos:{mood:"playful",friendliness:8,humour:10,banter:10,competition:8,critique:6,initiative:9,character:10},debate:{mood:"annoyed",friendliness:5,humour:7,banter:8,competition:10,critique:10,initiative:8,character:9},reset:profileDefaults};Object.assign(p,sets[preset]);renderProfileControls()}
-const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges);renderProfileControls();renderProviderStatus()};
+const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges);$("#humanPace").checked=!!S.admin.humanPace;$("#replyDelay").value=S.admin.replyDelay;$("#maxReplies").value=S.admin.maxReplies;renderProfileControls();renderProviderStatus()};
 const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
 $("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
-$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);readProfileControls();providerReady.openai=S.profiles.openai.plan!=="off";providerReady.gemini=S.profiles.gemini.plan!=="off";save();closeSettings();checkProviders();notice("Every contestant's control panel saved.")};
+$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);S.admin.humanPace=$("#humanPace").checked;S.admin.replyDelay=Number($("#replyDelay").value);S.admin.maxReplies=Number($("#maxReplies").value);readProfileControls();providerReady.openai=S.profiles.openai.plan!=="off";providerReady.gemini=S.profiles.gemini.plan!=="off";save();closeSettings();checkProviders();render();notice("Admin roster and every contestant panel saved.")};
 function liveLabel(text,on=false){const b=$("#liveBtn");b.textContent=text;b.classList.toggle("liveOn",on)}
 function stopLiveHardware(){cancelAnimationFrame(liveFrame);liveFrame=0;if(liveRecorder&&liveRecorder.state!=="inactive")liveRecorder.stop();if(liveStream)liveStream.getTracks().forEach(t=>t.stop());liveRecorder=null;liveStream=null;if(liveMeter)liveMeter.close().catch(()=>{});liveMeter=null}
 async function transcribeLive(blob){
