@@ -37,26 +37,27 @@ async function readJson(response, provider) {
   return data;
 }
 
-async function callOpenAICompatible({ key, model, prompt, image, baseUrl, provider }) {
+async function callOpenAICompatible({ key, model, prompt, images = [], baseUrl, provider }) {
+  const modernOpenAI = provider === "OpenAI" && /^gpt-5\./.test(model);
+  const payload = {
+    model,
+    messages: [{ role: "user", content: images.length ? [{type:"text",text:prompt},...images.map(url=>({type:"image_url",image_url:{url}}))] : prompt }],
+    ...(modernOpenAI ? { max_completion_tokens: 300, reasoning_effort: "low" } : { temperature: 0.2, max_tokens: 260 }),
+  };
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: image ? [{type:"text",text:prompt},{type:"image_url",image_url:{url:image}}] : prompt }],
-      temperature: 0.2,
-      max_tokens: 260,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data = await readJson(response, provider);
   return data?.choices?.[0]?.message?.content;
 }
 
-async function callGemini({ key, model, prompt, image }) {
+async function callGemini({ key, model, prompt, images = [] }) {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/` +
     `${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
@@ -68,7 +69,7 @@ async function callGemini({ key, model, prompt, image }) {
       contents: [
         {
           role: "user",
-          parts: [{ text: prompt },...(image?[{inline_data:{mime_type:(image.match(/^data:([^;]+)/)||[])[1]||"image/jpeg",data:image.split(",")[1]}}]:[])],
+          parts: [{ text: prompt },...images.map(image=>({inline_data:{mime_type:(image.match(/^data:([^;]+)/)||[])[1]||"image/jpeg",data:image.split(",")[1]}}))],
         },
       ],
       generationConfig: {
@@ -120,12 +121,14 @@ export default async function handler(req, res) {
     mode = "autocorrect",
     challenge = "",
     image = "",
+    images = [],
     hint = "",
     used = [],
   } = req.body || {};
 
   const normalizedProvider = String(provider || "").toLowerCase();
   const selectedModel = model || DEFAULT_MODELS[normalizedProvider];
+  const selectedImages = (Array.isArray(images)&&images.length?images:(image?[image]:[])).slice(0,10);
 
   const prompt = `You are ${name}, participating in a friendly IRC-style group chat with Kyle and another AI.
 Reply naturally and conversationally to Kyle's message below.
@@ -149,7 +152,7 @@ Kyle's message: ${challenge}`;
         key: process.env.OPENAI_API_KEY,
         model: selectedModel,
         prompt,
-        image,
+        images: selectedImages,
         baseUrl: "https://api.openai.com/v1",
         provider: "OpenAI",
       });
@@ -162,7 +165,7 @@ Kyle's message: ${challenge}`;
         key: process.env.GEMINI_API_KEY,
         model: selectedModel,
         prompt,
-        image,
+        images: selectedImages,
       });
     } else if (normalizedProvider === "anthropic") {
       if (!process.env.ANTHROPIC_API_KEY) {

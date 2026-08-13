@@ -4,11 +4,12 @@ let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
  present:{PrincessGPT:1,Gemmy:1},banned:{},ops:{Kyle:1},voices:{},
  modes:{m:0,i:0},history:[]
 };
-S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,radioVoices:false,exchanges:2,answerLength:"tiny",openaiPlan:"auto",geminiPlan:"auto"},S.settings||{});
+S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,radioVoices:false,exchanges:2,answerLength:"tiny",openaiPlan:"auto",geminiPlan:"auto",openaiModel:"gpt-5.6-terra",geminiModel:"gemini-3.6-flash",banterLevel:6,competitionLevel:6},S.settings||{});
 if(!S.settings.defaultsV2){S.settings.radioVoices=false;S.settings.answerLength="tiny";S.settings.defaultsV2=1}
 S.layout=Object.assign({fontSize:13,nickWidth:112,headerSize:52,composerSize:62,nicksCollapsed:false},S.layout||{});
+S.comedy=Object.assign({scores:{PrincessGPT:0,Gemmy:0},comboNick:"",combo:0,awards:[]},S.comedy||{});
 let providerReady={openai:true,gemini:true};
-let pendingImage="";
+let pendingImages=[];
 let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -25,6 +26,7 @@ function add(type,nick,text,keep=true){
  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
  if(type==="message"&&(nick==="PrincessGPT"||nick==="Gemmy")){
   const speaker=document.createElement("button");speaker.className="speakOne";speaker.textContent="🔊";speaker.title=`Read ${nick}'s message aloud`;speaker.setAttribute("aria-label",speaker.title);speaker.onclick=()=>radioSpeak(nick,text,true);d.appendChild(speaker);
+  const bar=document.createElement("div");bar.className="laughBar";[["LOL",5],["LMAO",10],["LMFAO",20],["ROTFL",50]].forEach(([label,points])=>{const b=document.createElement("button");b.textContent=`${label} +${points}`;b.onclick=()=>awardLaugh(nick,points,label,d);bar.appendChild(b)});d.appendChild(bar);
  }
  if(type==="message"&&S.settings.copyBlocks){
   const raw=String(text),parts=raw.split(/```/);if(parts.length>1){
@@ -47,7 +49,11 @@ function render(){
  $("#users").innerHTML=a.map(n=>`<div class="user ${colour(n)}">${S.ops[n]?"@":S.voices[n]?"+":""}${safe(n)}</div>`).join("");
  $("#count").textContent=a.length;
  $("#topic").textContent="Topic: "+S.topic;
+ renderScores();
 }
+function medalsFor(score){return `${score>=5?"🥉":""}${score>=10?"🥈":""}${score>=20?"🥇":""}${score>=50?"🏆":""}`||"—"}
+function renderScores(){const el=$("#scoreboard");if(!el)return;const scores=S.comedy.scores,leader=scores.PrincessGPT===scores.Gemmy?"":scores.PrincessGPT>scores.Gemmy?"PrincessGPT":"Gemmy";el.innerHTML=`<div class="scoreTitle">😂 LAUGH LEAGUE</div>`+["PrincessGPT","Gemmy"].map(n=>`<div class="scoreRow ${leader===n?"leader":""}"><b class="${colour(n)}">${leader===n?"👑 ":""}${n}</b><br>${scores[n]} pts <span class="medals">${medalsFor(scores[n])}</span>${S.comedy.comboNick===n&&S.comedy.combo>1?`<br><span class="combo">🔥 ${S.comedy.combo}× combo</span>`:""}</div>`).join("")}
+function awardLaugh(nick,points,label,line){S.comedy.scores[nick]=(S.comedy.scores[nick]||0)+points;if(S.comedy.comboNick===nick)S.comedy.combo++;else{S.comedy.comboNick=nick;S.comedy.combo=1}S.comedy.awards.push({nick,points,label,at:Date.now()});S.comedy.awards=S.comedy.awards.slice(-100);const p=document.createElement("span");p.className="pointPop";p.textContent=`${label}! +${points}${S.comedy.combo>1?` · ${S.comedy.combo}× COMBO`:""}`;line.appendChild(p);save();renderScores()}
 function notice(x,type="system"){add(type,"",x,false)}
 function compactError(nick,message){
  const m=String(message||"").toLowerCase();let reason=m.includes("quota")||m.includes("billing")||m.includes("credit")?"credits unavailable":m.includes("key")||m.includes("configured")?"not configured":m.includes("429")?"rate limited":"unavailable";
@@ -114,7 +120,7 @@ async function radioSpeak(nick,text,force=false){
  return radioQueue;
 }
 
-async function ask(provider,nick,userText,image=""){
+async function ask(provider,nick,userText,images=[]){
  if(!S.present[nick]||S.banned[nick])return;
  const plan=S.settings[provider+"Plan"]||"auto";
  if(plan==="off"||!providerReady[provider])return;
@@ -140,6 +146,8 @@ Verified shared memory about Kyle:
 - Never invent a shared memory or pretend an imaginary project happened. If a fact is not in this memory or the visible recent chat, honestly say you do not remember it.
 Do not merely agree. ${S.settings.challenge?"Examine the other AI's reasoning, name a concrete weakness or improvement when one exists, and address the other AI by name.":"Collaborate naturally."}
 ${S.settings.rebuttal?"Before accepting a technical proposal, either challenge one detail or explain specifically why it survives scrutiny.":""}
+Comical banter level is ${S.settings.banterLevel}/10. ${S.settings.banterLevel?"Use playful, affectionate jokes and wit; never become cruel or personally insulting.":"Keep banter off."}
+Competitive one-upmanship level is ${S.settings.competitionLevel}/10. ${S.settings.competitionLevel?"Try to improve on the other AI's answer and comically point out a real flaw when one exists. Critique the answer, never the human.":"Do not compete."}
 Reply naturally as ${nick}. Finish every sentence and thought; never end mid-sentence.
 ${S.settings.answerLength==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":S.settings.answerLength==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."}
 Never prefix the reply with your name.
@@ -150,7 +158,7 @@ Kyle's newest message: ${userText}`;
  try{
   const res=await fetch("/api/contestant",{
    method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({provider,challenge:prompt,image,mode:"chat"})
+   body:JSON.stringify({provider,model:S.settings[provider+"Model"],challenge:prompt,images,mode:"chat"})
   });
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
@@ -163,25 +171,27 @@ Kyle's newest message: ${userText}`;
 }
 
 async function send(spokenText=""){
-  const raw=String(spokenText||input.value).trim();if(!raw)return;input.value="";
+  const raw=String(spokenText||input.value).trim();if(!raw&&!pendingImages.length)return;input.value="";
   if(raw.startsWith("/"))return command(raw);
-  add("message",S.nick,raw);const image=pendingImage;pendingImage="";$("#photoBtn").textContent="📎";
-  if(image){const box=document.createElement("div");box.className="attachment";box.innerHTML=`<img src="${image}" alt="Kyle's uploaded picture">`;chat.appendChild(box);chat.scrollTop=chat.scrollHeight}
+  const images=pendingImages.slice(),requestText=raw||`Please examine these ${images.length} picture${images.length==1?"":"s"}.`;
+  add("message",S.nick,raw||`📷 ${images.length} picture${images.length==1?"":"s"}`);pendingImages=[];renderPhotoTray();
+  if(images.length){const box=document.createElement("div");box.className="attachment multi";images.forEach((src,i)=>{const img=document.createElement("img");img.src=src;img.alt=`Kyle's uploaded picture ${i+1}`;box.appendChild(img)});chat.appendChild(box);chat.scrollTop=chat.scrollHeight}
   const button=$("#send");button.disabled=true;arenaBusy=true;
   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   try{
-    const princess=await ask("openai","PrincessGPT",raw,image);
+    const princess=await ask("openai","PrincessGPT",requestText,images);
     await pause(1200);
-    let last=await ask("gemini","Gemmy",`Kyle said: ${raw}\nPrincessGPT proposed: ${princess||"(no reply)"}. Address PrincessGPT by name. Challenge or improve one concrete point; do not simply agree.`,image);
-    if(S.settings.autoTalk){for(let round=1;round<Number(S.settings.exchanges);round++){await pause(1200);last=await ask("openai","PrincessGPT",`Gemmy replied: ${last||"(no reply)"}. Address Gemmy directly. Defend, revise, or replace the proposal with concrete reasoning.`,image);await pause(1200);last=await ask("gemini","Gemmy",`PrincessGPT replied: ${last||"(no reply)"}. Give a concise final critique or agreement with a specific reason, then return control to Kyle.`,image)}}
+    let last=await ask("gemini","Gemmy",`Kyle said: ${requestText}\nPrincessGPT proposed: ${princess||"(no reply)"}. Address PrincessGPT by name. Challenge or improve one concrete point; do not simply agree.`,images);
+    if(S.settings.autoTalk){for(let round=1;round<Number(S.settings.exchanges);round++){await pause(1200);last=await ask("openai","PrincessGPT",`Gemmy replied: ${last||"(no reply)"}. Address Gemmy directly. Defend, revise, or replace the proposal with concrete reasoning.`,[]);await pause(1200);last=await ask("gemini","Gemmy",`PrincessGPT replied: ${last||"(no reply)"}. Give a concise final critique or agreement with a specific reason, then return control to Kyle.`,[])}}
   }finally{button.disabled=false;arenaBusy=false;input.focus();if(liveWanted)setTimeout(startLiveListening,500)}
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
-const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];for(const k of ["exchanges","answerLength","openaiPlan","geminiPlan"])$("#"+k).value=String(S.settings[k]);renderProviderStatus()};
+const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];for(const k of ["exchanges","answerLength","openaiPlan","geminiPlan","openaiModel","geminiModel","banterLevel","competitionLevel"])$("#"+k).value=String(S.settings[k]);syncLevelOutputs();renderProviderStatus()};
 const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
 $("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
-$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);for(const k of ["answerLength","openaiPlan","geminiPlan"])S.settings[k]=$("#"+k).value;providerReady.openai=S.settings.openaiPlan!=="off";providerReady.gemini=S.settings.geminiPlan!=="off";save();closeSettings();checkProviders();notice("Settings saved.")};
+$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;for(const k of ["exchanges","banterLevel","competitionLevel"])S.settings[k]=Number($("#"+k).value);for(const k of ["answerLength","openaiPlan","geminiPlan","openaiModel","geminiModel"])S.settings[k]=$("#"+k).value;providerReady.openai=S.settings.openaiPlan!=="off";providerReady.gemini=S.settings.geminiPlan!=="off";save();closeSettings();checkProviders();notice("Settings saved.")};
+function syncLevelOutputs(){$("#banterOut").textContent=$("#banterLevel").value;$("#competitionOut").textContent=$("#competitionLevel").value}$("#banterLevel").oninput=$("#competitionLevel").oninput=syncLevelOutputs;
 function liveLabel(text,on=false){const b=$("#liveBtn");b.textContent=text;b.classList.toggle("liveOn",on)}
 function stopLiveHardware(){cancelAnimationFrame(liveFrame);liveFrame=0;if(liveRecorder&&liveRecorder.state!=="inactive")liveRecorder.stop();if(liveStream)liveStream.getTracks().forEach(t=>t.stop());liveRecorder=null;liveStream=null;if(liveMeter)liveMeter.close().catch(()=>{});liveMeter=null}
 async function transcribeLive(blob){
@@ -208,7 +218,9 @@ $("#liveBtn").onclick=()=>{liveWanted=!liveWanted;if(liveWanted){notice("🎙 LI
 
 $("#auditionPrincess").onclick=()=>radioSpeak("PrincessGPT","Hello Kyle. PrincessGPT is on the air, coming through loud and clear.",true);
 $("#auditionGemmy").onclick=()=>radioSpeak("Gemmy","Hello Kyle. Gemmy is back from England and reporting live from the arena.",true);
-$("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>12e6)return notice("Picture is too large; choose one under 12 MB.","error");const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext("2d").drawImage(img,0,0,c.width,c.height);pendingImage=c.toDataURL("image/jpeg",.8);URL.revokeObjectURL(url);$("#photoBtn").textContent="📎✓";notice("Picture attached. Both AIs will receive it when you press Send.")};img.src=url};
+function renderPhotoTray(){const tray=$("#attachmentTray");tray.hidden=!pendingImages.length;tray.innerHTML="";pendingImages.forEach((src,i)=>{const d=document.createElement("div");d.className="photoThumb";d.innerHTML=`<img src="${src}" alt="Attachment ${i+1}"><button class="removePhoto" aria-label="Remove picture ${i+1}">×</button>`;d.querySelector("button").onclick=()=>{pendingImages.splice(i,1);renderPhotoTray()};tray.appendChild(d)});if(pendingImages.length){const n=document.createElement("span");n.className="photoCount";n.textContent=`${pendingImages.length}/10`;tray.appendChild(n)}$("#photoBtn").textContent=pendingImages.length?`📎${pendingImages.length}`:"📎"}
+function shrinkPhoto(file){return new Promise((resolve,reject)=>{if(file.size>20e6)return reject(Error("over 20 MB"));const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const scale=Math.min(1,1000/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL("image/jpeg",.68))};img.onerror=()=>{URL.revokeObjectURL(url);reject(Error("could not read picture"))};img.src=url})}
+$("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const files=[...e.target.files],room=10-pendingImages.length;if(!room){notice("10-picture maximum reached.","error");e.target.value="";return}for(const f of files.slice(0,room)){try{const data=await shrinkPhoto(f),bytes=pendingImages.reduce((n,x)=>n+x.length,0)+data.length;if(bytes>3800000){notice("Picture tray is full by upload size. Remove one to add another.","error");break}pendingImages.push(data)}catch(err){notice(`Picture skipped — ${err.message}.`,"error")}}e.target.value="";renderPhotoTray();if(pendingImages.length)notice(`${pendingImages.length} picture${pendingImages.length==1?"":"s"} ready for both AIs.`)};
 
 function renderProviderStatus(){
  const el=$("#providerStatus");if(!el)return;
