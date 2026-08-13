@@ -37,12 +37,12 @@ async function readJson(response, provider) {
   return data;
 }
 
-async function callOpenAICompatible({ key, model, prompt, images = [], baseUrl, provider }) {
+async function callOpenAICompatible({ key, model, prompt, images = [], baseUrl, provider, reasoning = "low" }) {
   const modernOpenAI = provider === "OpenAI" && /^gpt-5\./.test(model);
   const payload = {
     model,
     messages: [{ role: "user", content: images.length ? [{type:"text",text:prompt},...images.map(url=>({type:"image_url",image_url:{url}}))] : prompt }],
-    ...(modernOpenAI ? { max_completion_tokens: 300, reasoning_effort: "low" } : { temperature: 0.2, max_tokens: 260 }),
+    ...(modernOpenAI ? { max_completion_tokens: 300, reasoning_effort: reasoning } : { temperature: 0.2, max_tokens: 260 }),
   };
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -122,6 +122,7 @@ export default async function handler(req, res) {
     challenge = "",
     image = "",
     images = [],
+    reasoning = "low",
     hint = "",
     used = [],
   } = req.body || {};
@@ -155,6 +156,7 @@ Kyle's message: ${challenge}`;
         images: selectedImages,
         baseUrl: "https://api.openai.com/v1",
         provider: "OpenAI",
+        reasoning,
       });
     } else if (normalizedProvider === "gemini") {
       if (!process.env.GEMINI_API_KEY) {

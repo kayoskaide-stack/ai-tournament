@@ -8,6 +8,10 @@ S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:
 if(!S.settings.defaultsV2){S.settings.radioVoices=false;S.settings.answerLength="tiny";S.settings.defaultsV2=1}
 S.layout=Object.assign({fontSize:13,nickWidth:112,headerSize:52,composerSize:62,nicksCollapsed:false},S.layout||{});
 S.comedy=Object.assign({scores:{PrincessGPT:0,Gemmy:0},comboNick:"",combo:0,awards:[]},S.comedy||{});
+const profileDefaults={mood:"friendly",friendliness:8,humour:7,banter:6,competition:6,critique:6,initiative:6,character:9,reasoning:"low",length:"tiny",language:"auto",custom:""};
+S.profiles=S.profiles||{};
+S.profiles.openai=Object.assign({},profileDefaults,{model:S.settings.openaiModel||"gpt-5.6-terra",plan:S.settings.openaiPlan||"auto"},S.profiles.openai||{});
+S.profiles.gemini=Object.assign({},profileDefaults,{mood:"playful",model:S.settings.geminiModel||"gemini-3.6-flash",plan:S.settings.geminiPlan||"auto"},S.profiles.gemini||{});
 let providerReady={openai:true,gemini:true};
 let pendingImages=[];
 let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
@@ -122,7 +126,7 @@ async function radioSpeak(nick,text,force=false){
 
 async function ask(provider,nick,userText,images=[]){
  if(!S.present[nick]||S.banned[nick])return;
- const plan=S.settings[provider+"Plan"]||"auto";
+ const profile=S.profiles[provider]||profileDefaults,plan=profile.plan||"auto";
  if(plan==="off"||!providerReady[provider])return;
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])
   return notice(`${nick} cannot speak while channel mode +m is active.`);
@@ -146,10 +150,11 @@ Verified shared memory about Kyle:
 - Never invent a shared memory or pretend an imaginary project happened. If a fact is not in this memory or the visible recent chat, honestly say you do not remember it.
 Do not merely agree. ${S.settings.challenge?"Examine the other AI's reasoning, name a concrete weakness or improvement when one exists, and address the other AI by name.":"Collaborate naturally."}
 ${S.settings.rebuttal?"Before accepting a technical proposal, either challenge one detail or explain specifically why it survives scrutiny.":""}
-Comical banter level is ${S.settings.banterLevel}/10. ${S.settings.banterLevel?"Use playful, affectionate jokes and wit; never become cruel or personally insulting.":"Keep banter off."}
-Competitive one-upmanship level is ${S.settings.competitionLevel}/10. ${S.settings.competitionLevel?"Try to improve on the other AI's answer and comically point out a real flaw when one exists. Critique the answer, never the human.":"Do not compete."}
+Your configured mood is ${profile.mood}. Friendliness ${profile.friendliness}/10; humour ${profile.humour}/10; banter ${profile.banter}/10; competitive one-upmanship ${profile.competition}/10; critical sharpness ${profile.critique}/10; initiative ${profile.initiative}/10; character strength ${profile.character}/10.
+Use comedy at the configured intensity, but never become cruel, threatening, or personally insulting. Critique answers, never the human. ${profile.custom?`Additional operator direction: ${profile.custom}`:""}
+Reply language: ${profile.language==="auto"?"match Kyle's language":profile.language}.
 Reply naturally as ${nick}. Finish every sentence and thought; never end mid-sentence.
-${S.settings.answerLength==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":S.settings.answerLength==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."}
+${profile.length==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":profile.length==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."}
 Never prefix the reply with your name.
 Topic: ${S.topic}
 Recent chat:
@@ -158,7 +163,7 @@ Kyle's newest message: ${userText}`;
  try{
   const res=await fetch("/api/contestant",{
    method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({provider,model:S.settings[provider+"Model"],challenge:prompt,images,mode:"chat"})
+   body:JSON.stringify({provider,model:profile.model,reasoning:profile.reasoning,challenge:prompt,images,mode:"chat"})
   });
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
@@ -187,11 +192,15 @@ async function send(spokenText=""){
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
-const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];for(const k of ["exchanges","answerLength","openaiPlan","geminiPlan","openaiModel","geminiModel","banterLevel","competitionLevel"])$("#"+k).value=String(S.settings[k]);syncLevelOutputs();renderProviderStatus()};
+const modelOptions={openai:[["gpt-5.6-sol","5.6 Sol — flagship"],["gpt-5.6-terra","5.6 Terra — balanced"],["gpt-5.6-luna","5.6 Luna — light/economy"],["gpt-4o-mini","4o Mini — legacy economy"]],gemini:[["gemini-3.6-flash","Gemini 3.6 Flash"],["gemini-3.5-flash-lite","Gemini 3.5 Flash-Lite"],["gemini-3.1-pro-preview","Gemini 3.1 Pro Preview"],["gemini-3-flash-preview","Gemini 3 Flash Preview"]]};
+const selectHtml=(key,items,value)=>`<select data-key="${key}">${items.map(([v,n])=>`<option value="${v}" ${v===String(value)?"selected":""}>${n}</option>`).join("")}</select>`;
+function renderProfileControls(){for(const provider of ["openai","gemini"]){const p=S.profiles[provider],el=$("#"+provider+"Controls"),range=k=>`<label>${k[0].toUpperCase()+k.slice(1)} <input data-key="${k}" type="range" min="0" max="10" value="${p[k]}"><output>${p[k]}</output></label>`;el.innerHTML=`<div class="controlHint">Every value below belongs only to this contestant.</div><div class="panelPreset"><button type="button" data-preset="friendly">😊 Friendly</button><button type="button" data-preset="chaos">🤪 Comedy chaos</button><button type="button" data-preset="debate">⚔️ Fierce debate</button><button type="button" data-preset="reset">↺ Reset</button></div><label>Service ${selectHtml("plan",[["auto","Auto-detect"],["paid","Paid/API credits"],["free","Free/limited"],["off","Sit out"]],p.plan)}</label><label>Language model ${selectHtml("model",modelOptions[provider],p.model)}</label><label>Reasoning ${selectHtml("reasoning",[["none","Instant/none"],["low","Light"],["medium","Smart"],["high","Deep"],["xhigh","Expert"],["max","Maximum"]],p.reasoning)}</label><label>Mood ${selectHtml("mood",[["friendly","Friendly"],["playful","Playful"],["neutral","Neutral"],["unfriendly","Unfriendly"],["annoyed","Annoyed"],["mad","Mad"],["super-pissed","Super pissed — still safe/comical"]],p.mood)}</label><label>Reply length ${selectHtml("length",[["tiny","Very short"],["short","Short"],["normal","Normal"]],p.length)}</label><label>Language ${selectHtml("language",[["auto","Match user"],["English","English"],["French","French"],["Spanish","Spanish"]],p.language)}</label>${["friendliness","humour","banter","competition","critique","initiative","character"].map(range).join("")}<label class="directionLabel">Special direction</label><textarea class="customDirection" data-key="custom" placeholder="Optional custom behaviour…">${safe(p.custom)}</textarea>`;el.querySelectorAll("input[type=range]").forEach(x=>x.oninput=()=>x.nextElementSibling.textContent=x.value);el.querySelectorAll("[data-preset]").forEach(b=>b.onclick=()=>applyProfilePreset(provider,b.dataset.preset))}}
+function readProfileControls(){for(const provider of ["openai","gemini"]){$("#"+provider+"Controls").querySelectorAll("[data-key]").forEach(x=>S.profiles[provider][x.dataset.key]=x.type==="range"?Number(x.value):x.value)}}
+function applyProfilePreset(provider,preset){readProfileControls();const p=S.profiles[provider],sets={friendly:{mood:"friendly",friendliness:10,humour:6,banter:4,competition:3,critique:4,initiative:6,character:9},chaos:{mood:"playful",friendliness:8,humour:10,banter:10,competition:8,critique:6,initiative:9,character:10},debate:{mood:"annoyed",friendliness:5,humour:7,banter:8,competition:10,critique:10,initiative:8,character:9},reset:profileDefaults};Object.assign(p,sets[preset]);renderProfileControls()}
+const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges);renderProfileControls();renderProviderStatus()};
 const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
 $("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
-$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;for(const k of ["exchanges","banterLevel","competitionLevel"])S.settings[k]=Number($("#"+k).value);for(const k of ["answerLength","openaiPlan","geminiPlan","openaiModel","geminiModel"])S.settings[k]=$("#"+k).value;providerReady.openai=S.settings.openaiPlan!=="off";providerReady.gemini=S.settings.geminiPlan!=="off";save();closeSettings();checkProviders();notice("Settings saved.")};
-function syncLevelOutputs(){$("#banterOut").textContent=$("#banterLevel").value;$("#competitionOut").textContent=$("#competitionLevel").value}$("#banterLevel").oninput=$("#competitionLevel").oninput=syncLevelOutputs;
+$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);readProfileControls();providerReady.openai=S.profiles.openai.plan!=="off";providerReady.gemini=S.profiles.gemini.plan!=="off";save();closeSettings();checkProviders();notice("Every contestant's control panel saved.")};
 function liveLabel(text,on=false){const b=$("#liveBtn");b.textContent=text;b.classList.toggle("liveOn",on)}
 function stopLiveHardware(){cancelAnimationFrame(liveFrame);liveFrame=0;if(liveRecorder&&liveRecorder.state!=="inactive")liveRecorder.stop();if(liveStream)liveStream.getTracks().forEach(t=>t.stop());liveRecorder=null;liveStream=null;if(liveMeter)liveMeter.close().catch(()=>{});liveMeter=null}
 async function transcribeLive(blob){
@@ -224,11 +233,11 @@ $("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{co
 
 function renderProviderStatus(){
  const el=$("#providerStatus");if(!el)return;
- const chip=(name,key)=>`<span class="providerChip ${providerReady[key]?"on":"off"}">${providerReady[key]?"●":"○"} ${name}: ${providerReady[key]?(S.settings[key+"Plan"]||"auto"):"sitting out"}</span>`;
+ const chip=(name,key)=>`<span class="providerChip ${providerReady[key]?"on":"off"}">${providerReady[key]?"●":"○"} ${name}: ${providerReady[key]?(S.profiles[key].plan||"auto"):"sitting out"}</span>`;
  el.innerHTML=chip("PrincessGPT","openai")+chip("Gemmy","gemini");
 }
 async function checkProviders(){
- try{const r=await fetch("/api/status",{cache:"no-store"}),d=await r.json();const configured=(d.configured||[]).map(x=>x.toLowerCase());providerReady.openai=S.settings.openaiPlan!=="off"&&configured.includes("openai");providerReady.gemini=S.settings.geminiPlan!=="off"&&configured.includes("gemini")}catch{}
+ try{const r=await fetch("/api/status",{cache:"no-store"}),d=await r.json();const configured=(d.configured||[]).map(x=>x.toLowerCase());providerReady.openai=S.profiles.openai.plan!=="off"&&configured.includes("openai");providerReady.gemini=S.profiles.gemini.plan!=="off"&&configured.includes("gemini")}catch{}
  renderProviderStatus();render();
 }
 function applyLayout(){

@@ -34,13 +34,8 @@
 <section id="layoutPanel" hidden><label>Text <input id="fontSize" type="range" min="10" max="22" step="1"></label><label>Names <input id="nickWidth" type="range" min="76" max="240" step="4"></label><label>Header <input id="headerSize" type="range" min="34" max="90" step="2"></label><label>Composer <input id="composerSize" type="range" min="48" max="110" step="2"></label></section>
 <div id="shade" hidden></div><section id="settings" hidden><div class="settingsHead"><b>⚙️ ARENA SETTINGS</b><button id="closeSettings">×</button></div><label><input id="copyBlocks" type="checkbox"> Copy buttons on code blocks</label><label><input id="challenge" type="checkbox"> AIs challenge each other</label><label><input id="rebuttal" type="checkbox"> Require rebuttal before agreement</label><label><input id="autoTalk" type="checkbox"> Continue automatically</label><label>AI exchanges <select id="exchanges"><option>1</option><option>2</option><option>3</option></select></label>
 <label><input id="radioVoices" type="checkbox"> 📻 Read AI replies aloud</label>
-<label>Answer length <select id="answerLength"><option value="tiny">Very short</option><option value="short">Short</option><option value="normal">Normal</option></select></label>
-<label>PrincessGPT access <select id="openaiPlan"><option value="auto">Auto-detect</option><option value="paid">Paid/API credits</option><option value="free">Free/limited</option><option value="off">Sit out</option></select></label>
-<label>Gemmy access <select id="geminiPlan"><option value="auto">Auto-detect</option><option value="paid">Paid/API credits</option><option value="free">Free/limited</option><option value="off">Sit out</option></select></label>
-<label>PrincessGPT model <select id="openaiModel"><option value="gpt-5.6-sol">5.6 Sol</option><option value="gpt-5.6-terra">5.6 Terra</option><option value="gpt-5.6-luna">5.6 Luna</option><option value="gpt-4o-mini">4o Mini</option></select></label>
-<label>Gemmy model <select id="geminiModel"><option value="gemini-3.6-flash">Gemini 3.6 Flash</option><option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option><option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option></select></label>
-<label>Banter level <input id="banterLevel" type="range" min="0" max="10"><output id="banterOut"></output></label>
-<label>Competition level <input id="competitionLevel" type="range" min="0" max="10"><output id="competitionOut"></output></label>
+<details class="contestantPanel" open><summary>👸 PrincessGPT control panel</summary><div id="openaiControls" class="controlGrid"></div></details>
+<details class="contestantPanel"><summary>💎 Gemmy control panel</summary><div id="geminiControls" class="controlGrid"></div></details>
 <div id="providerStatus" aria-live="polite"></div>
 <div class="voiceAuditions"><button id="auditionPrincess" type="button">▶ PrincessGPT voice</button><button id="auditionGemmy" type="button">▶ Gemmy voice</button></div>
 <button id="saveSettings">Save settings</button></section>
