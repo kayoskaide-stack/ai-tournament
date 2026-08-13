@@ -1,0 +1,22 @@
+name: Arena Safety Gate
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install without running package scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Parse every JavaScript file
+        run: find . -path ./.git -prune -o -name '*.js' -type f -exec node --check {} \;
+      - name: Reject conflict markers and whitespace errors
+        run: |
+          git diff --check origin/main...HEAD
+          ! git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'
