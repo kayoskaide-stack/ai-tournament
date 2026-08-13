@@ -9,14 +9,14 @@
 <body>
 <div class="app">
 <header>
-  <div class="heading"><i></i><b>#ai-tournament</b><small>LIVE</small><button id="settingsBtn" aria-label="Open settings">⚙️</button></div>
+  <div class="heading"><i></i><b>#ai-tournament</b><small>LIVE</small><span id="deviceBadge"></span><button id="settingsBtn" aria-label="Open settings">⚙️</button></div>
   <div id="topic">Topic: Kyle, PrincessGPT and Gemmy enter the arena.</div>
 </header>
 
 <div class="main">
   <section id="chat"></section>
-  <aside>
-    <h3>USERS — <span id="count">3</span></h3>
+  <aside id="nickPanel">
+    <h3>USERS — <span id="count">3</span><button id="collapseNicks" title="Collapse names">›</button></h3>
     <div id="users"></div>
   </aside>
 </div>
@@ -28,8 +28,14 @@
   <button id="send">Send</button>
 </footer>
 </div>
+<div id="layoutDock"><button id="layoutBtn" title="Size the Arena">↔ SIZE</button><button id="layoutDone" hidden>DONE</button><button id="layoutReset" hidden>REALIGN ALL</button></div>
+<section id="layoutPanel" hidden><label>Text <input id="fontSize" type="range" min="10" max="22" step="1"></label><label>Names <input id="nickWidth" type="range" min="76" max="240" step="4"></label><label>Header <input id="headerSize" type="range" min="34" max="90" step="2"></label><label>Composer <input id="composerSize" type="range" min="48" max="110" step="2"></label></section>
 <div id="shade" hidden></div><section id="settings" hidden><div class="settingsHead"><b>⚙️ ARENA SETTINGS</b><button id="closeSettings">×</button></div><label><input id="copyBlocks" type="checkbox"> Copy buttons on code blocks</label><label><input id="challenge" type="checkbox"> AIs challenge each other</label><label><input id="rebuttal" type="checkbox"> Require rebuttal before agreement</label><label><input id="autoTalk" type="checkbox"> Continue automatically</label><label>AI exchanges <select id="exchanges"><option>1</option><option>2</option><option>3</option></select></label>
 <label><input id="radioVoices" type="checkbox"> 📻 Read AI replies aloud</label>
+<label>Answer length <select id="answerLength"><option value="tiny">Very short</option><option value="short">Short</option><option value="normal">Normal</option></select></label>
+<label>PrincessGPT access <select id="openaiPlan"><option value="auto">Auto-detect</option><option value="paid">Paid/API credits</option><option value="free">Free/limited</option><option value="off">Sit out</option></select></label>
+<label>Gemmy access <select id="geminiPlan"><option value="auto">Auto-detect</option><option value="paid">Paid/API credits</option><option value="free">Free/limited</option><option value="off">Sit out</option></select></label>
+<div id="providerStatus" aria-live="polite"></div>
 <div class="voiceAuditions"><button id="auditionPrincess" type="button">▶ PrincessGPT voice</button><button id="auditionGemmy" type="button">▶ Gemmy voice</button></div>
 <button id="saveSettings">Save settings</button></section>
 <script src="/app.js"></script>

@@ -48,7 +48,7 @@ async function callOpenAICompatible({ key, model, prompt, image, baseUrl, provid
       model,
       messages: [{ role: "user", content: image ? [{type:"text",text:prompt},{type:"image_url",image_url:{url:image}}] : prompt }],
       temperature: 0.2,
-      max_tokens: 700,
+      max_tokens: 260,
     }),
   });
 
@@ -73,7 +73,7 @@ async function callGemini({ key, model, prompt, image }) {
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 300,
       },
     }),
   });
@@ -94,7 +94,7 @@ async function callClaude({ key, model, prompt }) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 700,
+      max_tokens: 260,
       temperature: 0.2,
       messages: [{ role: "user", content: prompt }],
     }),

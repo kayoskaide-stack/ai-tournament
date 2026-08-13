@@ -4,7 +4,10 @@ let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
  present:{PrincessGPT:1,Gemmy:1},banned:{},ops:{Kyle:1},voices:{},
  modes:{m:0,i:0},history:[]
 };
-S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,radioVoices:true,exchanges:2},S.settings||{});
+S.settings=Object.assign({copyBlocks:true,challenge:true,rebuttal:true,autoTalk:true,radioVoices:false,exchanges:2,answerLength:"tiny",openaiPlan:"auto",geminiPlan:"auto"},S.settings||{});
+if(!S.settings.defaultsV2){S.settings.radioVoices=false;S.settings.answerLength="tiny";S.settings.defaultsV2=1}
+S.layout=Object.assign({fontSize:13,nickWidth:112,headerSize:52,composerSize:62,nicksCollapsed:false},S.layout||{});
+let providerReady={openai:true,gemini:true};
 let pendingImage="";
 let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
@@ -20,6 +23,9 @@ function add(type,nick,text,keep=true){
   ?`<span class=time>${time()}</span> * <span class=${colour(nick)}>${safe(nick)}</span> ${safe(text)}`
   :`<span class=time>${time()}</span> ${safe(text)}`;
  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+ if(type==="message"&&(nick==="PrincessGPT"||nick==="Gemmy")){
+  const speaker=document.createElement("button");speaker.className="speakOne";speaker.textContent="🔊";speaker.title=`Read ${nick}'s message aloud`;speaker.setAttribute("aria-label",speaker.title);speaker.onclick=()=>radioSpeak(nick,text,true);d.appendChild(speaker);
+ }
  if(type==="message"&&S.settings.copyBlocks){
   const raw=String(text),parts=raw.split(/```/);if(parts.length>1){
    d.innerHTML=`<span class=time>${time()}</span> &lt;<span class="nick ${colour(nick)}">${safe(nick)}</span>&gt; `;
@@ -43,6 +49,10 @@ function render(){
  $("#topic").textContent="Topic: "+S.topic;
 }
 function notice(x,type="system"){add(type,"",x,false)}
+function compactError(nick,message){
+ const m=String(message||"").toLowerCase();let reason=m.includes("quota")||m.includes("billing")||m.includes("credit")?"credits unavailable":m.includes("key")||m.includes("configured")?"not configured":m.includes("429")?"rate limited":"unavailable";
+ notice(`⚠ ${nick} sits out — ${reason}.`,"error");
+}
 function help(){
  ["Commands: /me /topic /nick /whois /names",
   "/op /deop /voice /devoice /kick /ban /unban /invite",
@@ -106,6 +116,8 @@ async function radioSpeak(nick,text,force=false){
 
 async function ask(provider,nick,userText,image=""){
  if(!S.present[nick]||S.banned[nick])return;
+ const plan=S.settings[provider+"Plan"]||"auto";
+ if(plan==="off"||!providerReady[provider])return;
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])
   return notice(`${nick} cannot speak while channel mode +m is active.`);
  const t=document.createElement("div");t.className="typing";
@@ -129,6 +141,7 @@ Verified shared memory about Kyle:
 Do not merely agree. ${S.settings.challenge?"Examine the other AI's reasoning, name a concrete weakness or improvement when one exists, and address the other AI by name.":"Collaborate naturally."}
 ${S.settings.rebuttal?"Before accepting a technical proposal, either challenge one detail or explain specifically why it survives scrutiny.":""}
 Reply naturally as ${nick}. Finish every sentence and thought; never end mid-sentence.
+${S.settings.answerLength==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":S.settings.answerLength==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."}
 Never prefix the reply with your name.
 Topic: ${S.topic}
 Recent chat:
@@ -146,7 +159,7 @@ Kyle's newest message: ${userText}`;
   if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
   if(!answer)throw Error("No readable message returned");
   t.remove();add("message",nick,answer);await radioSpeak(nick,answer);return answer;
- }catch(e){t.remove();notice(`${nick} connection error: ${e.message}`,"error")}
+ }catch(e){t.remove();providerReady[provider]=false;compactError(nick,e.message);renderProviderStatus()}
 }
 
 async function send(spokenText=""){
@@ -165,10 +178,10 @@ async function send(spokenText=""){
 }
 $("#send").onclick=send;
 input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send()}};
-const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];$("#exchanges").value=String(S.settings.exchanges)};
+const syncSettings=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])$("#"+k).checked=!!S.settings[k];for(const k of ["exchanges","answerLength","openaiPlan","geminiPlan"])$("#"+k).value=String(S.settings[k]);renderProviderStatus()};
 const closeSettings=()=>{$("#settings").hidden=true;$("#shade").hidden=true};
 $("#settingsBtn").onclick=()=>{syncSettings();$("#settings").hidden=false;$("#shade").hidden=false};$("#closeSettings").onclick=$("#shade").onclick=closeSettings;
-$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);save();closeSettings();notice("Arena settings saved. 🤓❤️🌧️⚔️")};
+$("#saveSettings").onclick=()=>{for(const k of ["copyBlocks","challenge","rebuttal","autoTalk","radioVoices"])S.settings[k]=$("#"+k).checked;S.settings.exchanges=Number($("#exchanges").value);for(const k of ["answerLength","openaiPlan","geminiPlan"])S.settings[k]=$("#"+k).value;providerReady.openai=S.settings.openaiPlan!=="off";providerReady.gemini=S.settings.geminiPlan!=="off";save();closeSettings();checkProviders();notice("Settings saved.")};
 function liveLabel(text,on=false){const b=$("#liveBtn");b.textContent=text;b.classList.toggle("liveOn",on)}
 function stopLiveHardware(){cancelAnimationFrame(liveFrame);liveFrame=0;if(liveRecorder&&liveRecorder.state!=="inactive")liveRecorder.stop();if(liveStream)liveStream.getTracks().forEach(t=>t.stop());liveRecorder=null;liveStream=null;if(liveMeter)liveMeter.close().catch(()=>{});liveMeter=null}
 async function transcribeLive(blob){
@@ -196,6 +209,26 @@ $("#liveBtn").onclick=()=>{liveWanted=!liveWanted;if(liveWanted){notice("🎙 LI
 $("#auditionPrincess").onclick=()=>radioSpeak("PrincessGPT","Hello Kyle. PrincessGPT is on the air, coming through loud and clear.",true);
 $("#auditionGemmy").onclick=()=>radioSpeak("Gemmy","Hello Kyle. Gemmy is back from England and reporting live from the arena.",true);
 $("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>12e6)return notice("Picture is too large; choose one under 12 MB.","error");const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext("2d").drawImage(img,0,0,c.width,c.height);pendingImage=c.toDataURL("image/jpeg",.8);URL.revokeObjectURL(url);$("#photoBtn").textContent="📎✓";notice("Picture attached. Both AIs will receive it when you press Send.")};img.src=url};
+
+function renderProviderStatus(){
+ const el=$("#providerStatus");if(!el)return;
+ const chip=(name,key)=>`<span class="providerChip ${providerReady[key]?"on":"off"}">${providerReady[key]?"●":"○"} ${name}: ${providerReady[key]?(S.settings[key+"Plan"]||"auto"):"sitting out"}</span>`;
+ el.innerHTML=chip("PrincessGPT","openai")+chip("Gemmy","gemini");
+}
+async function checkProviders(){
+ try{const r=await fetch("/api/status",{cache:"no-store"}),d=await r.json();const configured=(d.configured||[]).map(x=>x.toLowerCase());providerReady.openai=S.settings.openaiPlan!=="off"&&configured.includes("openai");providerReady.gemini=S.settings.geminiPlan!=="off"&&configured.includes("gemini")}catch{}
+ renderProviderStatus();render();
+}
+function applyLayout(){
+ const r=document.documentElement.style;r.setProperty("--chat-font",S.layout.fontSize+"px");r.setProperty("--nick-width",S.layout.nickWidth+"px");r.setProperty("--header-height",S.layout.headerSize+"px");r.setProperty("--composer-height",S.layout.composerSize+"px");document.body.classList.toggle("nicksCollapsed",!!S.layout.nicksCollapsed);
+ for(const [id,key] of [["fontSize","fontSize"],["nickWidth","nickWidth"],["headerSize","headerSize"],["composerSize","composerSize"]])if($("#"+id))$("#"+id).value=S.layout[key];
+}
+function layoutMode(on){document.body.classList.toggle("layoutEditing",on);$("#layoutPanel").hidden=!on;$("#layoutBtn").hidden=on;$("#layoutDone").hidden=!on;$("#layoutReset").hidden=!on}
+$("#layoutBtn").onclick=()=>layoutMode(true);$("#layoutDone").onclick=()=>{save();layoutMode(false)};$("#layoutReset").onclick=()=>{S.layout={fontSize:13,nickWidth:112,headerSize:52,composerSize:62,nicksCollapsed:false};applyLayout();save()};
+for(const [id,key] of [["fontSize","fontSize"],["nickWidth","nickWidth"],["headerSize","headerSize"],["composerSize","composerSize"]])$("#"+id).oninput=e=>{S.layout[key]=Number(e.target.value);applyLayout()};
+$("#collapseNicks").onclick=()=>{S.layout.nicksCollapsed=!S.layout.nicksCollapsed;applyLayout();save()};
+const ua=navigator.userAgent,ios=(ua.match(/OS (\d+)[_.](\d+)/)||[]).slice(1,3).join(".");$("#deviceBadge").textContent=/iPhone|iPad|iPod/.test(ua)?`iOS ${ios||"device"}`:/Android/.test(ua)?"Android":innerWidth<700?"Mobile":"Desktop";document.documentElement.dataset.device=innerWidth<700?"mobile":"desktop";
+applyLayout();checkProviders();
 render();
 notice(`*** ${S.nick} joined #ai-tournament`);
-notice("*** PrincessGPT and Gemmy connected. Type /help for commands.");
+notice("*** Arena ready. Unavailable AIs quietly sit out. Type /help for commands.");
