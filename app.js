@@ -12,6 +12,7 @@ const profileDefaults={mood:"friendly",friendliness:8,humour:7,banter:6,competit
 S.profiles=S.profiles||{};
 S.profiles.openai=Object.assign({},profileDefaults,{model:S.settings.openaiModel||"gpt-5.6-terra",plan:S.settings.openaiPlan||"auto"},S.profiles.openai||{});
 S.profiles.gemini=Object.assign({},profileDefaults,{mood:"playful",model:S.settings.geminiModel||"gemini-3.6-flash",plan:S.settings.geminiPlan||"auto"},S.profiles.gemini||{});
+S.workspace=Object.assign({channel:"ai-tournament",projects:{},ascii:{},skin:"midnight",logs:{}},S.workspace||{});
 let providerReady={openai:true,gemini:true};
 let pendingImages=[];
 let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
@@ -19,11 +20,13 @@ const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const time=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
 const colour=n=>n===S.nick?"kyle":n==="PrincessGPT"?"princess":"gemmy";
+const mircColours=["#fff","#000","#00007f","#009300","#ff0000","#7f0000","#9c009c","#fc7f00","#ffff00","#00fc00","#009393","#00ffff","#0000fc","#ff00ff","#7f7f7f","#d2d2d2"];
 
 function add(type,nick,text,keep=true){
  const d=document.createElement("div");d.className="line "+type;
+ const colourMatch=String(text).match(/^(?:\/(\d{1,2}),(\d{1,2})\s+|\x03(\d{1,2}),(\d{1,2}))/),fg=Number(colourMatch?.[1]??colourMatch?.[3]),bg=Number(colourMatch?.[2]??colourMatch?.[4]),formatted=safe(text).slice(colourMatch?.[0]?.length||0);
  d.innerHTML=type==="message"
-  ?`<span class=time>${time()}</span> &lt;<span class="nick ${colour(nick)}">${safe(nick)}</span>&gt; ${safe(text)}`
+  ?`<span class=time>${time()}</span> &lt;<span class="nick ${colour(nick)}">${safe(nick)}</span>&gt; <span ${colourMatch?`style="color:${mircColours[fg]||mircColours[0]};background:${mircColours[bg]||mircColours[1]};padding:1px 3px"`:""}>${formatted}</span>`
   :type==="action"
   ?`<span class=time>${time()}</span> * <span class=${colour(nick)}>${safe(nick)}</span> ${safe(text)}`
   :`<span class=time>${time()}</span> ${safe(text)}`;
@@ -39,7 +42,8 @@ function add(type,nick,text,keep=true){
   }
  }
  if(keep&&(type==="message"||type==="action")){
-  S.history.push({nick,text});S.history=S.history.slice(-20);save();
+ S.history.push({nick,text});S.history=S.history.slice(-20);save();
+  const ch=S.workspace.channel;S.workspace.logs[ch]=S.workspace.logs[ch]||[];S.workspace.logs[ch].push({at:new Date().toISOString(),nick,text});S.workspace.logs[ch]=S.workspace.logs[ch].slice(-2000);save();
  }
 }
 function name(x){
@@ -53,6 +57,7 @@ function render(){
  $("#users").innerHTML=a.map(n=>`<div class="user ${colour(n)}">${S.ops[n]?"@":S.voices[n]?"+":""}${safe(n)}</div>`).join("");
  $("#count").textContent=a.length;
  $("#topic").textContent="Topic: "+S.topic;
+ $(".heading b").textContent="#"+S.workspace.channel;
  renderScores();
 }
 function medalsFor(score){return `${score>=5?"🥉":""}${score>=10?"🥈":""}${score>=20?"🥇":""}${score>=50?"🏆":""}`||"—"}
@@ -177,6 +182,8 @@ Kyle's newest message: ${userText}`;
 
 async function send(spokenText=""){
   const raw=String(spokenText||input.value).trim();if(!raw&&!pendingImages.length)return;input.value="";
+  if(raw.startsWith("!catchup")||raw.startsWith("!reingest")){const log=S.workspace.logs[S.workspace.channel]||[],n=raw.includes("full")?log.length:Math.min(40,log.length),digest=log.slice(-n).map(x=>`${x.nick}: ${x.text}`).join("\n");return send(`Project catch-up from the last ${n} logged messages:\n${digest}`)}
+  if(raw.startsWith("!really?")){const log=S.workspace.logs[S.workspace.channel]||[],last=[...log].reverse().find(x=>x.nick!==S.nick);return send(`FACT-CHECK COURT: Independently review this last participant statement. Identify claims as confirmed, likely, uncertain, suspected hallucination, or demonstrably false. Give a short reason. Do not kick anyone automatically. Statement by ${last?.nick||"unknown"}: ${last?.text||"No prior statement."}`)}
   if(raw.startsWith("/"))return command(raw);
   const images=pendingImages.slice(),requestText=raw||`Please examine these ${images.length} picture${images.length==1?"":"s"}.`;
   add("message",S.nick,raw||`📷 ${images.length} picture${images.length==1?"":"s"}`);pendingImages=[];renderPhotoTray();
@@ -230,6 +237,18 @@ $("#auditionGemmy").onclick=()=>radioSpeak("Gemmy","Hello Kyle. Gemmy is back fr
 function renderPhotoTray(){const tray=$("#attachmentTray");tray.hidden=!pendingImages.length;tray.innerHTML="";pendingImages.forEach((src,i)=>{const d=document.createElement("div");d.className="photoThumb";d.innerHTML=`<img src="${src}" alt="Attachment ${i+1}"><button class="removePhoto" aria-label="Remove picture ${i+1}">×</button>`;d.querySelector("button").onclick=()=>{pendingImages.splice(i,1);renderPhotoTray()};tray.appendChild(d)});if(pendingImages.length){const n=document.createElement("span");n.className="photoCount";n.textContent=`${pendingImages.length}/10`;tray.appendChild(n)}$("#photoBtn").textContent=pendingImages.length?`📎${pendingImages.length}`:"📎"}
 function shrinkPhoto(file){return new Promise((resolve,reject)=>{if(file.size>20e6)return reject(Error("over 20 MB"));const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const scale=Math.min(1,1000/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL("image/jpeg",.68))};img.onerror=()=>{URL.revokeObjectURL(url);reject(Error("could not read picture"))};img.src=url})}
 $("#photoBtn").onclick=()=>$("#photo").click();$("#photo").onchange=async e=>{const files=[...e.target.files],room=10-pendingImages.length;if(!room){notice("10-picture maximum reached.","error");e.target.value="";return}for(const f of files.slice(0,room)){try{const data=await shrinkPhoto(f),bytes=pendingImages.reduce((n,x)=>n+x.length,0)+data.length;if(bytes>3800000){notice("Picture tray is full by upload size. Remove one to add another.","error");break}pendingImages.push(data)}catch(err){notice(`Picture skipped — ${err.message}.`,"error")}}e.target.value="";renderPhotoTray();if(pendingImages.length)notice(`${pendingImages.length} picture${pendingImages.length==1?"":"s"} ready for both AIs.`)};
+let pickedFg=8,pickedBg=1;
+function renderColourPicker(){for(const [id,selected,isFg] of [["fgPalette",pickedFg,true],["bgPalette",pickedBg,false]]){const el=$("#"+id);el.innerHTML="";mircColours.forEach((c,i)=>{const b=document.createElement("button");b.className="colourSwatch"+(i===selected?" selected":"");b.style.background=c;b.innerHTML=`<span>${i}</span>`;b.onclick=()=>{if(isFg)pickedFg=i;else pickedBg=i;renderColourPicker()};el.appendChild(b)})}const p=$(".colourPreview");p.style.color=mircColours[pickedFg];p.style.background=mircColours[pickedBg]}
+$("#colourBtn").onclick=()=>{$("#colourPicker").hidden=false;renderColourPicker()};$("#closeColour").onclick=()=>$("#colourPicker").hidden=true;$("#applyColour").onclick=()=>{input.value=`/${pickedFg},${pickedBg} `+input.value;$("#colourPicker").hidden=true;input.focus()};$("#resetColour").onclick=()=>{input.value=input.value.replace(/^(?:\/\d{1,2},\d{1,2}\s+|\x03\d{1,2},\d{1,2})/,"");$("#colourPicker").hidden=true;input.focus()};
+
+const wb=(title,html)=>{$("#workbenchTitle").textContent=title;$("#workbenchBody").innerHTML=html;$("#workbench").hidden=false};$("#closeWorkbench").onclick=()=>$("#workbench").hidden=true;
+function projectMenu(){const cards=Object.values(S.workspace.projects).map(p=>`<div class="projectCard"><b>#${safe(p.channel)}</b><br><small>${safe(p.topic)}</small><div class="workActions"><button data-open="${safe(p.channel)}">Open</button></div></div>`).join("");wb("Projects",`<div class="workActions"><button id="newProject">＋ Start Project</button></div>${cards||"No saved projects yet."}`);$("#newProject").onclick=()=>{wb("Start Project",`<label>Project name<input id="pName"></label><label>Channel name<input id="pChannel" placeholder="project-name"></label><label>Topic<input id="pTopic"></label><label>Privacy<select id="pPrivacy"><option>public</option><option>invite-only</option><option>secret</option></select></label><button id="createProject">Create local project</button><p class="ircOffline">Undernet creation awaits the persistent IRC relay.</p>`);$("#createProject").onclick=createProject};$("#workbenchBody").onclick=e=>{if(e.target.dataset.open)openProject(e.target.dataset.open)}}
+function createProject(){const channel=$("#pChannel").value.trim().replace(/^#/,"").replace(/\s+/g,"-").toLowerCase();if(!channel)return;S.workspace.projects[channel]={name:$("#pName").value.trim()||channel,channel,topic:$("#pTopic").value.trim()||"Project channel",privacy:$("#pPrivacy").value};S.workspace.logs[channel]=S.workspace.logs[channel]||[];save();openProject(channel);$("#workbench").hidden=true;notice(`*** Local project #${channel} opened. IRC relay not connected yet.`)}
+function openProject(channel){const p=S.workspace.projects[channel];if(!p)return;S.workspace.channel=channel;S.topic=p.topic;S.history=[];chat.innerHTML="";save();render();notice(`*** ${S.nick} joined #${channel}`)}
+function asciiMenu(){const cards=Object.entries(S.workspace.ascii).map(([n,v])=>`<div class="asciiCard"><b>${safe(n)}</b><pre>${safe(v)}</pre><button data-ascii="${safe(n)}">Insert</button></div>`).join("");wb("Saved ASCII",`<div class="workActions"><button id="newAscii">＋ New ASCII</button></div>${cards||"ASCII folder is empty."}`);$("#newAscii").onclick=()=>{wb("ASCII Editor",`<label>Name<input id="asciiName"></label><label>Artwork<textarea id="asciiText"></textarea></label><button id="saveAscii">Save ASCII</button>`);$("#saveAscii").onclick=()=>{const n=$("#asciiName").value.trim();if(n){S.workspace.ascii[n]=$("#asciiText").value;save();asciiMenu()}}};$("#workbenchBody").onclick=e=>{if(e.target.dataset.ascii){input.value+=(input.value?"\n":"")+S.workspace.ascii[e.target.dataset.ascii];$("#workbench").hidden=true;input.focus()}}}
+function skinMenu(){wb("Skins",`<label>Skin<select id="skinPick"><option value="midnight">Midnight IRC</option><option value="classic">Classic mIRC</option><option value="amber">Amber terminal</option><option value="matrix">Matrix green</option></select></label><button id="applySkin">Apply and save</button>`);$("#skinPick").value=S.workspace.skin;$("#applySkin").onclick=()=>{S.workspace.skin=$("#skinPick").value;applySkin();save();$("#workbench").hidden=true}}
+function applySkin(){const themes={midnight:["#070b10","#d8e3eb","#60aaff"],classic:["#d5d5d5","#000080","#800000"],amber:["#100b00","#ffc247","#ff8c00"],matrix:["#000500","#6cff6c","#00aa44"]},t=themes[S.workspace.skin]||themes.midnight,r=document.documentElement.style;r.setProperty("--bg",t[0]);r.setProperty("--text",t[1]);r.setProperty("--blue",t[2])}
+$("#menuBar").onclick=e=>{const m=e.target.dataset.menu;if(!m)return;if(m==="projects")projectMenu();else if(m==="ascii")asciiMenu();else if(m==="skins"||m==="view")skinMenu();else if(m==="irc")wb("IRC",`<p class="ircOffline">Undernet relay: OFFLINE</p><p>Local project channels and logs are active. Real server creation, X login and nick authentication will activate after the persistent relay is installed.</p>`);else if(m==="file")projectMenu();else if(m==="edit")asciiMenu();else wb("Help / About",`<p><b>/8,1 text</b> — yellow on black</p><p><b>!catchup</b> or <b>!reingest full</b> — feed logged project context to available AIs</p><p><b>!really?</b> — review the last non-human statement. No automatic kick without human confirmation.</p>`)};
 
 function renderProviderStatus(){
  const el=$("#providerStatus");if(!el)return;
@@ -249,7 +268,7 @@ $("#layoutBtn").onclick=()=>layoutMode(true);$("#layoutDone").onclick=()=>{save(
 for(const [id,key] of [["fontSize","fontSize"],["nickWidth","nickWidth"],["headerSize","headerSize"],["composerSize","composerSize"]])$("#"+id).oninput=e=>{S.layout[key]=Number(e.target.value);applyLayout()};
 $("#collapseNicks").onclick=()=>{S.layout.nicksCollapsed=!S.layout.nicksCollapsed;applyLayout();save()};
 const ua=navigator.userAgent,ios=(ua.match(/OS (\d+)[_.](\d+)/)||[]).slice(1,3).join(".");$("#deviceBadge").textContent=/iPhone|iPad|iPod/.test(ua)?`iOS ${ios||"device"}`:/Android/.test(ua)?"Android":innerWidth<700?"Mobile":"Desktop";document.documentElement.dataset.device=innerWidth<700?"mobile":"desktop";
-applyLayout();checkProviders();
+applySkin();applyLayout();checkProviders();
 render();
 notice(`*** ${S.nick} joined #ai-tournament`);
 notice("*** Arena ready. Unavailable AIs quietly sit out. Type /help for commands.");

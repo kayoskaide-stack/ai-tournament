@@ -9,6 +9,7 @@
 <body>
 <div class="app">
 <header>
+  <nav id="menuBar"><button data-menu="file">File</button><button data-menu="edit">Edit</button><button data-menu="view">View</button><button data-menu="projects">Projects</button><button data-menu="ascii">ASCII</button><button data-menu="skins">Skins</button><button data-menu="irc">IRC</button><button data-menu="help">Help</button></nav>
   <div class="heading"><i></i><b>#ai-tournament</b><small>LIVE</small><span id="deviceBadge"></span><button id="settingsBtn" aria-label="Open settings">⚙️</button></div>
   <div id="topic">Topic: Kyle, PrincessGPT and Gemmy enter the arena.</div>
 </header>
@@ -21,11 +22,14 @@
     <div id="scoreboard"></div>
   </aside>
 </div>
+<section id="workbench" hidden><div class="settingsHead"><b id="workbenchTitle">Arena</b><button id="closeWorkbench">×</button></div><div id="workbenchBody"></div></section>
+<section id="colourPicker" hidden><div class="pickerHead"><b>🎨 mIRC COLOURS</b><button id="closeColour">×</button></div><small>Foreground</small><div id="fgPalette" class="colourPalette"></div><small>Background</small><div id="bgPalette" class="colourPalette"></div><div class="colourPreview">Preview text</div><div class="workActions"><button id="applyColour">APPLY TO NEXT MESSAGE</button><button id="resetColour">RESET</button></div></section>
 
 <div id="attachmentTray" hidden></div>
 <footer>
   <button id="liveBtn" aria-label="Start live conversation">🎙 LIVE</button>
   <button id="photoBtn" aria-label="Attach up to 10 pictures">📎</button><input id="photo" type="file" accept="image/*" multiple hidden>
+  <button id="colourBtn" aria-label="Choose mIRC text colours">🎨</button>
   <input id="input" autocomplete="off" placeholder="Message #ai-tournament or /help">
   <button id="send">Send</button>
 </footer>
