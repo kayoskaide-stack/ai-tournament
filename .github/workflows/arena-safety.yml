@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -18,5 +20,5 @@ jobs:
         run: find . -path ./.git -prune -o -name '*.js' -type f -exec node --check {} \;
       - name: Reject conflict markers and whitespace errors
         run: |
-          git diff --check origin/main...HEAD
+          git diff --check "${{ github.event.pull_request.base.sha }}"...HEAD
           ! git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'
