@@ -3,6 +3,9 @@ const DEFAULT_MODELS = {
   gemini: "gemini-3-flash-preview",
   anthropic: "claude-3-5-haiku-latest",
   xai: "grok-4.5",
+  deepseek: process.env.DEEPSEEK_MODEL || "deepseek-chat",
+  mistral: process.env.MISTRAL_MODEL || "mistral-small-latest",
+  openrouter: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
 };
 
 const PROJECT_REPO = {
@@ -413,6 +416,48 @@ Kyle's message: ${effectiveChallenge}`;
         key: process.env.ANTHROPIC_API_KEY,
         model: selectedModel,
         prompt,
+      });
+    } else if (normalizedProvider === "deepseek") {
+      if (!process.env.DEEPSEEK_API_KEY) {
+        return res.status(503).json({ error: "DEEPSEEK_API_KEY is not configured." });
+      }
+
+      text = await callOpenAICompatible({
+        key: process.env.DEEPSEEK_API_KEY,
+        model: selectedModel,
+        prompt,
+        images,
+        baseUrl: "https://api.deepseek.com/v1",
+        provider: "DeepSeek",
+        reasoning,
+      });
+    } else if (normalizedProvider === "mistral") {
+      if (!process.env.MISTRAL_API_KEY) {
+        return res.status(503).json({ error: "MISTRAL_API_KEY is not configured." });
+      }
+
+      text = await callOpenAICompatible({
+        key: process.env.MISTRAL_API_KEY,
+        model: selectedModel,
+        prompt,
+        images,
+        baseUrl: "https://api.mistral.ai/v1",
+        provider: "Mistral",
+        reasoning,
+      });
+    } else if (normalizedProvider === "openrouter") {
+      if (!process.env.OPENROUTER_API_KEY) {
+        return res.status(503).json({ error: "OPENROUTER_API_KEY is not configured." });
+      }
+
+      text = await callOpenAICompatible({
+        key: process.env.OPENROUTER_API_KEY,
+        model: selectedModel,
+        prompt,
+        images,
+        baseUrl: "https://openrouter.ai/api/v1",
+        provider: "OpenRouter",
+        reasoning,
       });
     } else if (normalizedProvider === "xai") {
       if (!process.env.XAI_API_KEY) {
