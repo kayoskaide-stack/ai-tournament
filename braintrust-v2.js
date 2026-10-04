@@ -3,7 +3,7 @@ const BRAIN_TOPIC = "Kyle's Brain Trust — Ask a question; every available AI m
 
 const MODEL_DEFAULTS={
  openai:"gpt-5.6-terra",
- gemini:"gemini-3-flash-preview",
+ gemini:"gemini-3.5-flash-lite",
  anthropic:"claude-3-5-haiku-latest",
  xai:"grok-4.5",
  deepseek:"deepseek-chat",

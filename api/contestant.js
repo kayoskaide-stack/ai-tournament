@@ -1,6 +1,6 @@
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
-  gemini: "gemini-3-flash-preview",
+  gemini: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
   anthropic: "claude-3-5-haiku-latest",
   xai: "grok-4.5",
   deepseek: process.env.DEEPSEEK_MODEL || "deepseek-chat",
@@ -265,21 +265,63 @@ async function callOpenAICompatible({ key, model, prompt, images = [], baseUrl, 
 }
 
 async function callGemini({ key, model, prompt, images = [] }) {
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/` +
-    `${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const FREE_FIRST = [
+    process.env.GEMINI_FREE_MODEL || "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-3.8-flash",
+  ];
 
-  let currentPrompt = prompt;
+  const requested = String(model || "").trim();
+  const candidates = [];
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (const name of [...FREE_FIRST, requested]) {
+    if (!name || candidates.includes(name)) continue;
+    candidates.push(name);
+  }
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function generationConfigFor(modelName) {
+    const config = { maxOutputTokens: 260 };
+
+    if (/^gemini-3\./.test(modelName)) {
+      config.thinkingConfig = {
+        thinkingLevel: /flash-lite/i.test(modelName) ? "minimal" : "low"
+      };
+    } else {
+      config.temperature = 0.2;
+    }
+
+    return config;
+  }
+
+  function errorDetails(data, raw, status) {
+    return (
+      data?.error?.message ||
+      data?.error?.status ||
+      data?.message ||
+      raw ||
+      `HTTP ${status}`
+    );
+  }
+
+  async function oneRequest(modelName, requestPrompt) {
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/` +
+      `${encodeURIComponent(modelName)}:generateContent`;
+
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+      },
       body: JSON.stringify({
         contents: [{
           role: "user",
           parts: [
-            { text: currentPrompt },
+            { text: requestPrompt },
             ...images.map(image => ({
               inline_data: {
                 mime_type: (image.match(/^data:([^;]+)/) || [])[1] || "image/jpeg",
@@ -288,36 +330,122 @@ async function callGemini({ key, model, prompt, images = [] }) {
             }))
           ]
         }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 300 }
+        generationConfig: generationConfigFor(modelName)
       })
     });
 
-    const data = await readJson(response, "Gemini");
-    const candidate = data?.candidates?.[0];
-    const text = String(candidate?.content?.parts?.map((part) => part?.text || "").join("") || "").trim();
-    const finishReason = String(candidate?.finishReason || "");
-    const looksCutOff =
-      !text ||
-      (finishReason && !["STOP", "MAX_TOKENS"].includes(finishReason)) ||
-      (text.length < 90 && !/[.!?…)'"\]]\s*$/.test(text));
+    const raw = await response.text();
+    let data = {};
 
-    if (!looksCutOff || attempt === 2) return text;
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = {};
+    }
 
-    console.warn(JSON.stringify({
-      event: "gemini_incomplete_retry",
-      finishReason,
-      chars: text.length,
-      attempt
-    }));
-
-    currentPrompt = prompt +
-      "\n\nYour previous response was cut off before finishing. " +
-      "Answer the same request again from the beginning as one complete, self-contained response. " +
-      "Do not leave the final sentence unfinished.";
+    return { response, data, raw };
   }
 
-  return "";
+  let lastError = null;
+
+  for (const modelName of candidates) {
+    let requestPrompt = prompt;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const { response, data, raw } = await oneRequest(modelName, requestPrompt);
+
+      if (response.ok) {
+        const candidate = data?.candidates?.[0];
+        const text = String(
+          candidate?.content?.parts?.map(part => part?.text || "").join("") || ""
+        ).trim();
+
+        const finishReason = String(candidate?.finishReason || "");
+        const looksCutOff =
+          !text ||
+          (finishReason && !["STOP", "MAX_TOKENS"].includes(finishReason)) ||
+          (text.length < 80 && !/[.!?…)'"\]]\s*$/.test(text));
+
+        if (!looksCutOff) {
+          console.log(JSON.stringify({
+            event: "gemini_free_max_success",
+            model: modelName,
+            attempt,
+            chars: text.length
+          }));
+          return text;
+        }
+
+        if (attempt === 1) {
+          requestPrompt =
+            prompt +
+            "\n\nAnswer completely in one concise self-contained response. " +
+            "Do not leave the final sentence unfinished.";
+          await sleep(350);
+          continue;
+        }
+
+        if (text) return text;
+
+        lastError = new Error(
+          `Gemini ${modelName} returned an empty/incomplete answer.`
+        );
+        break;
+      }
+
+      const details = errorDetails(data, raw, response.status);
+      const message = String(details);
+      lastError = new Error(
+        `Gemini ${modelName} failed (HTTP ${response.status}): ${message}`
+      );
+
+      console.warn(JSON.stringify({
+        event: "gemini_free_max_failure",
+        model: modelName,
+        status: response.status,
+        attempt,
+        detail: message.slice(0, 240)
+      }));
+
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(
+          `Gemini project/key access error (HTTP ${response.status}): ${message}`
+        );
+      }
+
+      if (response.status === 400 || response.status === 404) break;
+
+      if (response.status === 429) {
+        const retryHeader = Number(response.headers.get("retry-after") || 0);
+        if (attempt === 1) {
+          await sleep(
+            retryHeader > 0
+              ? Math.min(12000, retryHeader * 1000)
+              : 2200 + Math.floor(Math.random() * 900)
+          );
+          continue;
+        }
+        break;
+      }
+
+      if (response.status >= 500 && response.status <= 599) {
+        if (attempt === 1) {
+          await sleep(1400 + Math.floor(Math.random() * 700));
+          continue;
+        }
+        break;
+      }
+
+      throw lastError;
+    }
+  }
+
+  throw (
+    lastError ||
+    new Error("Gemini free-tier models are temporarily unavailable.")
+  );
 }
+
 async function callClaude({ key, model, prompt }) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

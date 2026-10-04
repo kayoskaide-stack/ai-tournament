@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     }
     if (provider === "gemini") {
       if (!process.env.GEMINI_API_KEY) throw Error("GEMINI_API_KEY is not configured");
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite-tts:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({contents:[{parts:[{text:`Read exactly this text in a natural warm breezy conversational voice. Friendly, clever, relaxed and expressive, like a familiar AI companion speaking directly to one person. Avoid radio-presenter, announcer or overly theatrical delivery. Do not add words.\n\n${text}`}]}],generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:"Aoede"}}}}})
       });
