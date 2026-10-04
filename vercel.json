@@ -1,4 +1,34 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/contestant",
+      "destination": "/api/secure/contestant"
+    },
+    {
+      "source": "/api/free-life",
+      "destination": "/api/secure/free-life"
+    },
+    {
+      "source": "/api/speak",
+      "destination": "/api/secure/speak"
+    },
+    {
+      "source": "/api/transcribe",
+      "destination": "/api/secure/transcribe"
+    },
+    {
+      "source": "/api/status",
+      "destination": "/api/secure/status"
+    },
+    {
+      "source": "/api/funds",
+      "destination": "/api/secure/funds"
+    },
+    {
+      "source": "/api/autopilot",
+      "destination": "/api/secure/autopilot"
+    }
+  ]
 }

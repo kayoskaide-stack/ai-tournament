@@ -11,6 +11,8 @@ const cfg = {
   user: env.IRC_USER || "princessgpt",
   realname: env.IRC_REALNAME || "PrincessGPT IRC Relay",
   channel: env.IRC_CHANNEL || "#ai-tournament",
+  channelKey: env.IRC_CHANNEL_KEY || "",
+  enforceModes: env.IRC_ENFORCE_MODES === "1",
   username: env.UNDERNET_USERNAME || "",
   password: env.UNDERNET_PASSWORD || "",
   arena: (env.ARENA_BASE_URL || "").replace(/\/+$/, ""),
@@ -67,7 +69,11 @@ function requireConfig() {
 }
 function send(line) {
   if (!socket || socket.destroyed) return false;
-  log("irc_out", { line });
+  let logged = String(line);
+  for (const secret of [cfg.password, cfg.channelKey]) {
+    if (secret) logged = logged.split(secret).join("[REDACTED]");
+  }
+  log("irc_out", { line: logged });
   socket.write(line + "\r\n");
   return true;
 }
@@ -415,9 +421,23 @@ function handle(line) {
       msg.command === "422"
     ) {
       setTimeout(
-        () => send(`JOIN ${cfg.channel}`),
+        () => send(cfg.channelKey ? `JOIN ${cfg.channel} ${cfg.channelKey}` : `JOIN ${cfg.channel}`),
         500
       );
+    }
+    return;
+  }
+  if (
+    msg.command === "366" &&
+    String(msg.params?.[1] || msg.params?.[0] || "").toLowerCase() === cfg.channel.toLowerCase()
+  ) {
+    if (cfg.enforceModes && cfg.channelKey) {
+      if (cfg.username && cfg.password) {
+        send(`PRIVMSG X@channels.undernet.org :OP ${cfg.channel} ${cfg.nick}`);
+      }
+      setTimeout(() => {
+        send(`MODE ${cfg.channel} +ntsk ${cfg.channelKey}`);
+      }, 1600);
     }
     return;
   }

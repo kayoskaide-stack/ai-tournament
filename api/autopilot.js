@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 const OWNER="kayoskaide-stack",REPO="ai-tournament",API="https://api.github.com";
-const editable=/^(app\.js|index\.html|styles\.css|README\.md|package\.json|api\/[a-z0-9._-]+\.js)$/i;
+const editable=/^(app\.js|index\.html|styles\.css|README\.md|package\.json|vercel\.json|braintrust-v2\.js|adaptive-display\.js|voice-unlock\.js|gemini-free-max\.js|free-life-ui\.js|shellter\/relay\.mjs|api\/(contestant|status|speak|transcribe|free-life|funds|relay-contestant)\.js)$/i;
 const headers=token=>({Authorization:`Bearer ${token}`,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json"});
 const clean=s=>String(s||"").replace(/[^a-zA-Z0-9._/-]/g,"-").slice(0,120);
 
@@ -26,23 +26,30 @@ async function codex(task,files){
  let d={};try{d=JSON.parse(raw)}catch{}if(!r.ok)throw Error(`Coding model ${r.status}: ${d?.error?.message||raw.slice(0,180)}`);
  const text=d?.choices?.[0]?.message?.content;if(!text)throw Error("Coding model returned no patch");let out;try{out=JSON.parse(text)}catch{throw Error("Coding model returned invalid JSON")};return out;
 }
-async function propose(task){
+async function propose(task,requester="Kyle"){
  task=String(task||"").trim();if(task.length<8||task.length>1800)throw Error("Build request must be 8–1800 characters");
  const base=await gh("/git/ref/heads/main"),baseSha=base.object.sha,stamp=new Date().toISOString().replace(/[-:.TZ]/g,"").slice(0,14),backup=`arena-backup-${stamp}`,branch=`arena/autopilot-${stamp}`;
  await gh("/git/refs",{method:"POST",body:JSON.stringify({ref:`refs/tags/${backup}`,sha:baseSha})});
  const verified=await gh(`/git/ref/tags/${backup}`);if(verified.object.sha!==baseSha)throw Error("Backup verification failed — build cancelled");
  await gh("/git/refs",{method:"POST",body:JSON.stringify({ref:`refs/heads/${branch}`,sha:baseSha})});
- const paths=["app.js","index.html","styles.css","package.json","README.md","api/contestant.js","api/status.js","api/speak.js","api/transcribe.js"],source=[];
+ const paths=["app.js","index.html","styles.css","package.json","README.md","vercel.json","braintrust-v2.js","adaptive-display.js","voice-unlock.js","gemini-free-max.js","free-life-ui.js","shellter/relay.mjs","api/contestant.js","api/status.js","api/speak.js","api/transcribe.js","api/free-life.js","api/funds.js","api/relay-contestant.js"],source=[];
  for(const p of paths){try{source.push(await file(p,baseSha))}catch(e){if(!String(e.message).includes("404"))throw e}}
  const result=await codex(task,source),changes=Array.isArray(result.files)?result.files:[];
  if(!changes.length)throw Error("CodeSavant proposed no file changes");
  for(const change of changes){const path=String(change.path||"");if(!editable.test(path))throw Error(`Blocked unsafe path: ${path}`);const old=source.find(f=>f.path===path);if(!old)throw Error(`Only existing approved files may change tonight: ${path}`);if(typeof change.content!=="string"||change.content.length>600000)throw Error(`Invalid generated file: ${path}`);await gh(`/contents/${path}`,{method:"PUT",body:JSON.stringify({message:`Arena Auto-Pilot: ${task.slice(0,70)}`,content:Buffer.from(change.content).toString("base64"),sha:old.sha,branch})})}
- const pr=await gh("/pulls",{method:"POST",body:JSON.stringify({title:`🤖 Arena: ${task.slice(0,72)}`,head:branch,base:"main",body:`## Arena Auto-Pilot\n\n**Requested by:** Kyle\n\n${task}\n\n**CodeSavant summary:** ${String(result.summary||"Implementation prepared.").slice(0,1500)}\n\n**Rigorous backup:** \`${backup}\`\n\nProduction is unchanged until Kyle approves after checks and preview.`})});
+ const pr=await gh("/pulls",{method:"POST",body:JSON.stringify({title:`🤖 Arena: ${task.slice(0,72)}`,head:branch,base:"main",body:`## Arena Auto-Pilot\n\n**Requested by:** ${requester}\n\n${task}\n\n**CodeSavant summary:** ${String(result.summary||"Implementation prepared.").slice(0,1500)}\n\n**Rigorous backup:** \`${backup}\`\n\nProduction is unchanged until Kyle approves after checks and preview.`})});
  return {ok:true,stage:"preview",pr:pr.number,url:pr.html_url,branch,backup,summary:String(result.summary||"Implementation prepared.")};
 }
 async function status(prNumber){
- const pr=await gh(`/pulls/${Number(prNumber)}`),checks=await gh(`/commits/${pr.head.sha}/check-runs`),runs=(checks.check_runs||[]).map(x=>({name:x.name,status:x.status,conclusion:x.conclusion,url:x.html_url}));
- return {ok:true,pr:pr.number,state:pr.state,mergeable:pr.mergeable,sha:pr.head.sha,url:pr.html_url,checks:runs,ready:runs.length>0&&runs.every(x=>x.status==="completed"&&["success","neutral","skipped"].includes(x.conclusion))};
+ const pr=await gh(`/pulls/${Number(prNumber)}`);
+ const checks=await gh(`/commits/${pr.head.sha}/check-runs`);
+ const combined=await gh(`/commits/${pr.head.sha}/status`);
+ const runs=(checks.check_runs||[]).map(x=>({name:x.name,status:x.status,conclusion:x.conclusion,url:x.html_url}));
+ const checkReady=runs.length>0&&runs.every(x=>x.status==="completed"&&["success","neutral","skipped"].includes(x.conclusion));
+ const statusReady=combined.state==="success";
+ const failed=runs.some(x=>x.status==="completed"&&!["success","neutral","skipped"].includes(x.conclusion))||combined.state==="failure"||combined.state==="error";
+ const vercel=(combined.statuses||[]).find(x=>/vercel/i.test(String(x.context||""))&&x.target_url);
+ return {ok:true,pr:pr.number,state:pr.state,mergeable:pr.mergeable,sha:pr.head.sha,url:pr.html_url,checks:runs,combinedState:combined.state,previewUrl:vercel?.target_url||"",ready:!failed&&(checkReady||statusReady)};
 }
 async function approve(prNumber){
  const st=await status(prNumber);if(!st.ready)throw Error("Required checks are not all successful yet");
@@ -59,5 +66,5 @@ async function rollback(backup){
 
 export default async function handler(req,res){
  res.setHeader("Cache-Control","no-store");if(req.method!=="POST")return res.status(405).json({error:"POST only"});if(!authorized(req))return res.status(401).json({error:"Administrator key rejected"});
- try{const {action,task,pr,backup}=req.body||{};const result=action==="propose"?await propose(task):action==="status"?await status(pr):action==="approve"?await approve(pr):action==="reject"?await reject(pr):action==="rollback"?await rollback(backup):(()=>{throw Error("Unknown Auto-Pilot action")})();return res.status(200).json(await result)}catch(e){return res.status(400).json({error:e instanceof Error?e.message:String(e)})}
+ try{const {action,task,pr,backup}=req.body||{};const requester=req.braintrustUser?.nick||"Kyle";const result=action==="propose"?await propose(task,requester):action==="status"?await status(pr):action==="approve"?await approve(pr):action==="reject"?await reject(pr):action==="rollback"?await rollback(backup):(()=>{throw Error("Unknown Auto-Pilot action")})();return res.status(200).json(await result)}catch(e){return res.status(400).json({error:e instanceof Error?e.message:String(e)})}
 }
