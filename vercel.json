@@ -2,33 +2,17 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/api/contestant",
-      "destination": "/api/secure/contestant"
-    },
-    {
-      "source": "/api/free-life",
-      "destination": "/api/secure/free-life"
-    },
-    {
-      "source": "/api/speak",
-      "destination": "/api/secure/speak"
-    },
-    {
-      "source": "/api/transcribe",
-      "destination": "/api/secure/transcribe"
-    },
-    {
-      "source": "/api/status",
-      "destination": "/api/secure/status"
-    },
-    {
-      "source": "/api/funds",
-      "destination": "/api/secure/funds"
-    },
-    {
-      "source": "/api/autopilot",
-      "destination": "/api/secure/autopilot"
-    }
+    { "source": "/api/login", "destination": "/api/auth?action=login" },
+    { "source": "/api/session", "destination": "/api/auth?action=session" },
+    { "source": "/api/logout", "destination": "/api/auth?action=logout" },
+    { "source": "/api/users", "destination": "/api/admin?scope=users" },
+    { "source": "/api/security", "destination": "/api/admin?scope=security" },
+    { "source": "/api/contestant", "destination": "/api/gate?target=contestant" },
+    { "source": "/api/free-life", "destination": "/api/gate?target=free-life" },
+    { "source": "/api/speak", "destination": "/api/gate?target=speak" },
+    { "source": "/api/transcribe", "destination": "/api/gate?target=transcribe" },
+    { "source": "/api/status", "destination": "/api/gate?target=status" },
+    { "source": "/api/funds", "destination": "/api/gate?target=funds" },
+    { "source": "/api/autopilot", "destination": "/api/gate?target=autopilot" }
   ]
 }
