@@ -1,11 +1,11 @@
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   gemini: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
-  anthropic: "claude-3-5-haiku-latest",
-  xai: "grok-4.5",
+  anthropic: "claude-haiku-4-5-20251001",
+  xai: "grok-4.3",
   deepseek: process.env.DEEPSEEK_MODEL || "deepseek-chat",
   mistral: process.env.MISTRAL_MODEL || "mistral-small-latest",
-  openrouter: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
+  openrouter: process.env.OPENROUTER_MODEL || "openrouter/free",
 };
 
 const PROJECT_REPO = {

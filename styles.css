@@ -247,3 +247,35 @@ body.adaptiveDisplay .voiceUnlockPrompt button{
  font-size:var(--ad-small)!important;
  min-height:28px!important;
 }
+
+/* === FREE_LIFE_UI_CSS_V1 === */
+#users .aiUser{
+ position:relative;
+ flex-wrap:wrap;
+}
+#users .modelMini{
+ display:block;
+ flex:1 0 100%;
+ padding-left:0;
+ margin-top:1px;
+ color:#65788a;
+ font-size:6px;
+ line-height:7px;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+}
+#users .aiState.free{
+ color:#72e69b;
+ border-color:#318751;
+ background:#10271a;
+}
+#users .aiState.sleep{
+ color:#aaa;
+ border-color:#59616a;
+ background:#171a1d;
+}
+body.adaptiveDisplay #users .modelMini{
+ font-size:max(5px,calc(var(--ad-small) - 2px))!important;
+ line-height:7px!important;
+}

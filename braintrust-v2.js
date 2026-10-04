@@ -4,11 +4,11 @@ const BRAIN_TOPIC = "Kyle's Brain Trust — Ask a question; every available AI m
 const MODEL_DEFAULTS={
  openai:"gpt-5.6-terra",
  gemini:"gemini-3.5-flash-lite",
- anthropic:"claude-3-5-haiku-latest",
- xai:"grok-4.5",
+ anthropic:"claude-haiku-4-5-20251001",
+ xai:"grok-4.3",
  deepseek:"deepseek-chat",
  mistral:"mistral-small-latest",
- openrouter:"openai/gpt-4o-mini"
+ openrouter:"openrouter/free"
 };
 
 const PERSONAS={
@@ -20,6 +20,9 @@ const PERSONAS={
  mistral:"You are Mistral, the Brain Trust's fast European contestant: practical, concise, and independently minded.",
  openrouter:"You are OpenRouter, the Brain Trust's routing-seat contestant: compare approaches, spot gaps, and add the strongest useful angle."
 };
+
+// === FREE_LIFE_ROUTING_V1 ===
+const FREE_LIFE_PROVIDERS=new Set(["deepseek","mistral","openrouter"]);
 
 for(const a of AI_META){
  const existingProfile=S.profiles[a.key]||{};
@@ -100,7 +103,15 @@ async function brainAsk(provider,nick,userText,images=[]){
  if(
    plan==="off" ||
    !providerReady[provider] ||
-   S.providerState?.[provider]?.status==="out"
+   (
+    S.providerState?.[provider]?.status==="out" &&
+    !FREE_LIFE_PROVIDERS.has(provider)
+   )
+ ) return;
+
+ if(
+   typeof freeLifeCanCall==="function" &&
+   !freeLifeCanCall(provider)
  ) return;
 
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])return;
@@ -157,7 +168,11 @@ Current Brain Trust task:
 ${userText}`;
 
  try{
-  const res=await fetch("/api/contestant",{
+  const endpoint=FREE_LIFE_PROVIDERS.has(provider)
+   ?"/api/free-life"
+   :"/api/contestant";
+
+  const res=await fetch(endpoint,{
    method:"POST",
    headers:{"Content-Type":"application/json"},
    body:JSON.stringify({
@@ -201,8 +216,17 @@ ${userText}`;
   S.providerState[provider]=Object.assign(
    {},
    S.providerState[provider]||{},
-   {status:"ready",reason:""}
+   {
+    status:"ready",
+    reason:data.route||"",
+    model:data.model||profile.model||"",
+    route:data.route||provider,
+    free:Boolean(data.free)
+   }
   );
+
+  if(typeof freeLifeRecord==="function")
+   freeLifeRecord(provider,data);
 
   add("message",nick,answer);
 
@@ -237,6 +261,23 @@ send=async function(spokenText=""){
 
  if(!raw&&!pendingImages.length)
   return;
+
+ if(/^\/models?(?:\s|$)/i.test(raw)){
+  const wanted=raw.replace(/^\/models?\s*/i,"").trim().toLowerCase();
+  const rows=AI_META
+   .filter(a=>!wanted||a.nick.toLowerCase()===wanted||a.key===wanted)
+   .map(a=>{
+    const st=S.providerState?.[a.key]||{};
+    const configured=S.profiles?.[a.key]?.model||"unknown";
+    const model=st.model||configured;
+    const route=st.route||st.reason||a.provider;
+    const mode=st.free?"FREE":(st.status||"ready").toUpperCase();
+    return `${a.nick}: ${model} · ${route} · ${mode}`;
+   });
+  rows.forEach(x=>notice(`*** ${x}`));
+  input.value="";
+  return;
+ }
 
  if(raw.startsWith("/")||raw.startsWith("!"))
   return legacySend(raw);
