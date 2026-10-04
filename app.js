@@ -18,16 +18,52 @@ S.roster=S.roster||{};
 for(const [provider,nick] of [["openai","PrincessGPT"],["gemini","Gemmy"]])S.roster[provider]=Object.assign({nick,state:"present",charLimit:700,partReason:"Out for lunch in the cloud."},S.roster[provider]||{});
 S.specialists=Object.assign({coding:{nick:"CodeSavant",enabled:true,status:"ready",provider:"openai"},descript:{nick:"Underlord",enabled:false,status:"API setup required",provider:"descript"},shopping:{nick:"ShopScout",enabled:false,status:"No Rufus public API",provider:"shopping"}},S.specialists||{});
 S.autopilot=Object.assign({lastPr:0,lastBackup:"",lastUrl:""},S.autopilot||{});
-let providerReady={openai:true,gemini:true};
+let providerReady={openai:true,gemini:true,anthropic:true,xai:true,deepseek:true,mistral:true,openrouter:true};
 let pendingImages=[];
 let liveWanted=false,liveRecorder=null,liveStream=null,liveChunks=[],liveMeter=null,liveFrame=0,liveSpeaking=false,liveLastVoice=0,liveStarted=0,arenaBusy=false;
 const save=()=>localStorage.setItem("AITirc",JSON.stringify(S));
 const safe=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const time=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-const colour=n=>n===S.nick?"kyle":n===S.roster.openai.nick?"princess":"gemmy";
+// === VIRTUAL_AI_FUNDS_V1 ===
+const AI_META=[
+ {key:"openai",nick:"PrincessGPT",provider:"OpenAI",prefixes:["PRINCESSGPT","PRINCESS","OPENAI","GPT"],checkout:"https://platform.openai.com/settings/organization/billing/overview"},
+ {key:"gemini",nick:"Gemmy",provider:"Google Gemini",prefixes:["GEMMY","GEMINI","GOOGLE"],checkout:"https://aistudio.google.com/"},
+ {key:"anthropic",nick:"Claude",provider:"Anthropic",prefixes:["CLAUDE","ANTHROPIC"],checkout:"https://console.anthropic.com/settings/billing"},
+ {key:"xai",nick:"Grok",provider:"xAI",prefixes:["GROK","XAI","X.AI"],checkout:"https://console.x.ai/"},
+ {key:"deepseek",nick:"DeepSeek",provider:"DeepSeek",prefixes:["DEEPSEEK","DEEP SEEK"],checkout:"https://platform.deepseek.com/top_up"},
+ {key:"mistral",nick:"Mistral",provider:"Mistral",prefixes:["MISTRAL"],checkout:"https://console.mistral.ai/"},
+ {key:"openrouter",nick:"OpenRouter",provider:"OpenRouter",prefixes:["OPENROUTER","OPEN ROUTER"],checkout:"https://openrouter.ai/credits"}
+];
+S.providerState=S.providerState||{};
+for(const a of AI_META)S.providerState[a.key]=Object.assign({status:"ready",reason:"",balance:null,currency:"USD"},S.providerState[a.key]||{});
+function providerKeyForNick(nick){
+ const low=String(nick||"").trim().toLowerCase();
+ const hit=AI_META.find(a=>a.nick.toLowerCase()===low||a.prefixes.some(p=>p.toLowerCase()===low));
+ return hit?.key||"";
+}
+function virtualizeMessage(nick,text){
+ const originalNick=String(nick||"");
+ const raw=String(text??"");
+ const relayNick=S.roster?.openai?.nick||"PrincessGPT";
+ if(originalNick!==relayNick&&originalNick!=="PrincessGPT")return{nick:originalNick,text:raw};
+ for(const a of AI_META){
+  const labels=[a.nick,...a.prefixes].map(x=>x.replace(/[^A-Za-z0-9 _-]/g,"\\$&")).join("|");
+  const re=new RegExp("^\\s*(?:<|\\[)?(?:"+labels+")(?:>|\\])?\\s*:\\s*","i");
+  if(re.test(raw))return{nick:a.nick,text:raw.replace(re,"")};
+ }
+ return{nick:originalNick,text:raw};
+}
+const colour=n=>{if(n===S.nick)return"kyle";const k=providerKeyForNick(n);return k==="openai"?"princess":k==="gemini"?"gemmy":k?`ai-${k}`:"gemmy"};
 const mircColours=["#fff","#000","#00007f","#009300","#ff0000","#7f0000","#9c009c","#fc7f00","#ffff00","#00fc00","#009393","#00ffff","#0000fc","#ff00ff","#7f7f7f","#d2d2d2"];
 
 function add(type,nick,text,keep=true){
+ if(type==="message"){
+  const virtual=virtualizeMessage(nick,text);nick=virtual.nick;text=virtual.text;
+  const providerKey=providerKeyForNick(nick);
+  if(providerKey){
+   S.providerState[providerKey]=Object.assign({},S.providerState[providerKey]||{},{status:"ready",reason:""});
+  }
+ }
  const d=document.createElement("div");d.className="line "+type;
  const colourMatch=String(text).match(/^(?:\/(\d{1,2}),(\d{1,2})\s+|\x03(\d{1,2}),(\d{1,2}))/),fg=Number(colourMatch?.[1]??colourMatch?.[3]),bg=Number(colourMatch?.[2]??colourMatch?.[4]),formatted=safe(text).slice(colourMatch?.[0]?.length||0);
  d.innerHTML=type==="message"
@@ -53,16 +89,26 @@ function add(type,nick,text,keep=true){
 }
 function name(x){
  x=String(x||"").toLowerCase();
- if(["princess","princessgpt","chatgpt","gpt"].includes(x))return"PrincessGPT";
- if(["gemmy","gemini","gem"].includes(x))return"Gemmy";
  if(x==="kyle"||x===S.nick.toLowerCase())return S.nick;
+ for(const a of AI_META)if(a.nick.toLowerCase()===x||a.prefixes.some(p=>p.toLowerCase()===x))return a.nick;
 }
 function rosterNick(provider){const r=S.roster[provider];return r.state==="afk"?`${r.nick}-AFK`:r.nick}
 function active(provider){return ["present","quiet","mention"].includes(S.roster[provider].state)}
 function render(){
- let a=[S.nick,...["openai","gemini"].filter(active).map(rosterNick)];
- $("#users").innerHTML=a.map(n=>`<div class="user ${colour(n)}">${S.ops[n]?"@":S.voices[n]?"+":""}${safe(n)}</div>`).join("");
- $("#count").textContent=a.length;
+ const users=$("#users");
+ const human=`<div class="user kyle">@${safe(S.nick)}</div>`;
+ const aiRows=AI_META.map(a=>{
+  const state=S.providerState[a.key]||{};
+  let badge="";
+  if(state.status==="out")badge="OUT";
+  else if(state.status==="rate")badge="RATE";
+  else if(state.status==="err")badge="ERR";
+  else if(!providerReady[a.key])badge="OFF";
+  const why=safe(state.reason||(!providerReady[a.key]?"API not configured":""));
+  return `<div class="user aiUser ${colour(a.nick)}" title="${why}"><span class="userName">${safe(a.nick)}</span>${badge?`<span class="aiState ${badge.toLowerCase()}">${badge}</span>`:""}<a class="fundMini" href="/funds.html#${a.key}" title="${safe(a.nick)} funds">+$</a></div>`;
+ }).join("");
+ users.innerHTML=human+aiRows;
+ $("#count").textContent=1+AI_META.length;
  $("#topic").textContent="Topic: "+S.topic;
  $(".heading b").textContent="#"+S.workspace.channel;
  renderScores();
@@ -72,8 +118,18 @@ function renderScores(){const el=$("#scoreboard");if(!el)return;const scores=S.c
 function awardLaugh(nick,points,label,line){S.comedy.scores[nick]=(S.comedy.scores[nick]||0)+points;if(S.comedy.comboNick===nick)S.comedy.combo++;else{S.comedy.comboNick=nick;S.comedy.combo=1}S.comedy.awards.push({nick,points,label,at:Date.now()});S.comedy.awards=S.comedy.awards.slice(-100);const p=document.createElement("span");p.className="pointPop";p.textContent=`${label}! +${points}${S.comedy.combo>1?` · ${S.comedy.combo}× COMBO`:""}`;line.appendChild(p);save();renderScores()}
 function notice(x,type="system"){add(type,"",x,false)}
 function compactError(nick,message){
- const m=String(message||"").toLowerCase();let reason=m.includes("quota")||m.includes("billing")||m.includes("credit")?"credits unavailable":m.includes("key")||m.includes("configured")?"not configured":m.includes("429")?"rate limited":"unavailable";
- notice(`⚠ ${nick} sits out — ${reason}.`,"error");
+ const m=String(message||"").toLowerCase();
+ const out=/insufficient balance|out of balance|payment required|billing|credit|credits|funds|quota|\\b402\\b/.test(m);
+ const rate=!out&&(/rate limit|rate limited|\\b429\\b/.test(m));
+ const off=!out&&!rate&&(/api[_ -]?key|not configured|configured/.test(m));
+ const reason=out?"out of funds":rate?"rate limited":off?"not configured":"unavailable";
+ const status=out?"out":rate?"rate":off?"off":"err";
+ const key=providerKeyForNick(nick);
+ if(key){
+  S.providerState[key]=Object.assign({},S.providerState[key]||{},{status,reason});
+  save();render();
+ }
+ notice(`⚠ ${nick} ${out?"OUT":rate?"RATE":off?"OFF":"ERR"}.`,"error");
 }
 function adminKey(){let key=sessionStorage.getItem("arenaAdminKey")||"";if(!key){key=prompt("Kyle administrator key (stored only for this browser session):")||"";if(key)sessionStorage.setItem("arenaAdminKey",key)}return key}
 async function pilot(action,payload={}){const key=adminKey();if(!key)throw Error("Administrator key required");const r=await fetch("/api/autopilot",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({action,...payload})}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||`Auto-Pilot HTTP ${r.status}`);return d}
@@ -276,11 +332,22 @@ $("#menuBar").onclick=e=>{const m=e.target.dataset.menu;if(!m)return;if(m==="pro
 
 function renderProviderStatus(){
  const el=$("#providerStatus");if(!el)return;
- const chip=(name,key)=>`<span class="providerChip ${providerReady[key]?"on":"off"}">${providerReady[key]?"●":"○"} ${name}: ${providerReady[key]?(S.profiles[key].plan||"auto"):"sitting out"}</span>`;
- el.innerHTML=chip("PrincessGPT","openai")+chip("Gemmy","gemini");
+ el.innerHTML=AI_META.map(a=>{
+  const state=S.providerState[a.key]||{};
+  const up=!!providerReady[a.key];
+  const word=state.status==="out"?"OUT":state.status==="rate"?"RATE":state.status==="err"?"ERR":up?"ready":"OFF";
+  return `<span class="providerChip ${up&&state.status==="ready"?"on":"off"}">${up&&state.status==="ready"?"●":"○"} ${a.nick}: ${word}</span>`;
+ }).join("");
 }
 async function checkProviders(){
- try{const r=await fetch("/api/status",{cache:"no-store"}),d=await r.json();const configured=(d.configured||[]).map(x=>x.toLowerCase());providerReady.openai=S.profiles.openai.plan!=="off"&&configured.includes("openai");providerReady.gemini=S.profiles.gemini.plan!=="off"&&configured.includes("gemini")}catch{}
+ try{
+  const r=await fetch("/api/status",{cache:"no-store"}),d=await r.json();
+  const configured=new Set((d.configuredKeys||[]).map(x=>String(x).toLowerCase()));
+  for(const a of AI_META){
+   providerReady[a.key]=configured.has(a.key);
+   if(!providerReady[a.key]&&S.providerState[a.key]?.status==="ready")S.providerState[a.key].reason="API not configured";
+  }
+ }catch{}
  renderProviderStatus();render();
 }
 function applyLayout(){

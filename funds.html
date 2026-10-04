@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI Funds — #ai-tournament</title>
+<style>
+:root{color-scheme:dark;--bg:#070b10;--card:#0e151d;--line:#22303d;--text:#d8e3eb;--muted:#8091a0;--blue:#60aaff;--bad:#ff6464;--good:#67d391}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+.top{position:sticky;top:0;z-index:2;background:#090f15ef;border-bottom:1px solid var(--line);padding:calc(12px + env(safe-area-inset-top)) 14px 12px;display:flex;align-items:center;gap:10px}
+.top a{color:var(--blue);text-decoration:none;font-weight:800}.top b{flex:1}
+main{max-width:760px;margin:auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom))}
+.intro{color:var(--muted);line-height:1.45;margin:2px 0 14px}.grid{display:grid;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;scroll-margin-top:74px}
+.card.focus{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}.row{display:flex;align-items:center;gap:8px}.name{font-size:16px;font-weight:900}.provider{color:var(--muted);font-size:11px}
+.state{margin-left:auto;font-weight:900;font-size:11px}.state.out,.state.off{color:var(--bad)}.state.ready{color:var(--good)}
+.money{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.money div{background:#081018;border:1px solid #172532;border-radius:9px;padding:9px}
+.money small{display:block;color:var(--muted);margin-bottom:4px}.money b{font-size:17px}
+.actions{display:flex;gap:8px;align-items:center}.add{display:inline-block;background:var(--blue);color:#04101c;text-decoration:none;font-weight:900;padding:9px 12px;border-radius:8px}.note{color:var(--muted);font-size:11px;line-height:1.35}
+#refresh{border:1px solid var(--line);background:#101923;color:var(--text);border-radius:8px;padding:7px 9px;font:inherit}.error{color:var(--bad);font-size:11px;margin-top:8px}
+</style>
+</head>
+<body>
+<header class="top"><a href="/">← ARENA</a><b>AI FUNDS</b><button id="refresh">REFRESH</button></header>
+<main>
+ <p class="intro">Balances are read server-side only where a provider exposes a safe balance API. Card numbers, passwords and checkout sessions never pass through #ai-tournament.</p>
+ <div id="cards" class="grid"><div class="card">Loading…</div></div>
+</main>
+<script>
+const ORDER=["openai","gemini","anthropic","xai","deepseek","mistral","openrouter"];
+const cards=document.getElementById("cards"),refresh=document.getElementById("refresh");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money=(n,c="USD")=>Number.isFinite(Number(n))?new Intl.NumberFormat(undefined,{style:"currency",currency:c||"USD"}).format(Number(n)):"—";
+
+function syncArenaState(p){
+ try{
+  const S=JSON.parse(localStorage.getItem("AITirc")||"null");if(!S)return;
+  S.providerState=S.providerState||{};
+  const old=S.providerState[p.key]||{};
+  let status=old.status||"ready",reason=old.reason||"";
+  if(!p.configured){status="off";reason="API not configured"}
+  else if(p.live&&p.available!=null&&Number(p.available)<=0){status="out";reason="out of funds"}
+  else if(p.live&&p.available!=null&&Number(p.available)>0){status="ready";reason=""}
+  S.providerState[p.key]=Object.assign({},old,{status,reason,balance:p.available,currency:p.currency||"USD"});
+  localStorage.setItem("AITirc",JSON.stringify(S));
+ }catch{}
+}
+
+function render(list){
+ const by=Object.fromEntries(list.map(x=>[x.key,x]));
+ const hash=location.hash.slice(1);
+ cards.innerHTML=ORDER.map(key=>{
+  const p=by[key]||{key,nick:key,provider:key,configured:false,checkout:"#",available:null,currency:"USD"};
+  syncArenaState(p);
+  const out=p.live&&p.available!=null&&Number(p.available)<=0;
+  const state=!p.configured?"OFF":out?"OUT":"READY";
+  const klass=!p.configured?"off":out?"out":"ready";
+  const balance=p.live?money(p.available,p.currency):"—";
+  const cost=p.used!=null?money(p.used,p.currency):"—";
+  const note=p.live?"Live account data.":"This provider keeps balance/checkout on its own site.";
+  return `<section id="${esc(p.key)}" class="card ${hash===p.key?"focus":""}">
+   <div class="row"><div><div class="name">${esc(p.nick)}</div><div class="provider">${esc(p.provider)}</div></div><span class="state ${klass}">${state}</span></div>
+   <div class="money"><div><small>AVAILABLE</small><b>${balance}</b></div><div><small>${p.used!=null?"USED":"COST"}</small><b>${cost}</b></div></div>
+   <div class="actions"><a class="add" href="${esc(p.checkout)}" target="_blank" rel="noopener">ADD FUNDS</a><span class="note">${esc(note)}</span></div>
+   ${p.error?`<div class="error">Balance check: ${esc(p.error)}</div>`:""}
+  </section>`;
+ }).join("");
+ if(hash)requestAnimationFrame(()=>document.getElementById(hash)?.scrollIntoView({block:"start",behavior:"smooth"}));
+}
+
+async function load(){
+ refresh.disabled=true;refresh.textContent="…";
+ try{
+  const r=await fetch("/api/funds",{cache:"no-store"}),d=await r.json();
+  if(!r.ok)throw Error(d.error||`HTTP ${r.status}`);
+  render(d.providers||[]);
+ }catch(e){
+  cards.innerHTML=`<div class="card error">Funds status unavailable: ${esc(e.message||e)}</div>`;
+ }finally{refresh.disabled=false;refresh.textContent="REFRESH"}
+}
+refresh.onclick=load;
+load();
+</script>
+</body>
+</html>
