@@ -193,3 +193,25 @@ html, body {
  color:#d7a6af;
  overflow-wrap:anywhere
 }
+
+/* === IRC_JOIN_BANNER_CSS_V1 === */
+.joinBanner{padding-right:4px}
+.joinBanner.topicLabel{color:var(--gold);margin-top:5px;font-weight:bold}
+.joinBanner.topicText{
+ color:var(--gold);
+ padding:5px 8px;
+ margin:2px 0 5px 0;
+ border-left:2px solid var(--gold);
+ background:rgba(255,209,102,.06);
+ line-height:1.45
+}
+.joinBanner.userList{color:#9fb3c3}
+.joinBanner.arenaReady{color:var(--muted);margin-bottom:10px}
+.joinBanner.joinEvent{color:#9fb3c3}
+
+@media(max-width:700px){
+ .joinBanner.topicText{
+   font-size:calc(var(--chat-font) - 1px);
+   padding:6px 7px;
+ }
+}

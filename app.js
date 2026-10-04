@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s),chat=$("#chat"),input=$("#input");
 let S=JSON.parse(localStorage.getItem("AITirc")||"null")||{
- nick:"Kyle",topic:"Kyle, PrincessGPT and Gemmy enter the arena.",
+ nick:"Kyle",topic:"Kyle's Brain Trust — Ask a question; every available AI may answer, challenge, and refine it. Keep it respectful, lawful, and constructive. Off-limits requests are refused. 3 kicks = ban. Think big, debate clean. Have a beautiful day.",
  present:{PrincessGPT:1,Gemmy:1},banned:{},ops:{Kyle:1},voices:{},
  modes:{m:0,i:0},history:[]
 };
@@ -322,9 +322,26 @@ function renderColourPicker(){for(const [id,selected,isFg] of [["fgPalette",pick
 $("#colourBtn").onclick=()=>{$("#colourPicker").hidden=false;renderColourPicker()};$("#closeColour").onclick=()=>$("#colourPicker").hidden=true;$("#applyColour").onclick=()=>{input.value=`/${pickedFg},${pickedBg} `+input.value;$("#colourPicker").hidden=true;input.focus()};$("#resetColour").onclick=()=>{input.value=input.value.replace(/^(?:\/\d{1,2},\d{1,2}\s+|\x03\d{1,2},\d{1,2})/,"");$("#colourPicker").hidden=true;input.focus()};
 
 const wb=(title,html)=>{$("#workbenchTitle").textContent=title;$("#workbenchBody").innerHTML=html;$("#workbench").hidden=false};$("#closeWorkbench").onclick=()=>$("#workbench").hidden=true;
+// === IRC_JOIN_BANNER_V1 ===
+function joinSystemLine(text,kind="joinInfo"){
+ const d=document.createElement("div");
+ d.className=`line system joinBanner ${kind}`;
+ d.innerHTML=`<span class="time">${time()}</span> ${safe(text)}`;
+ chat.appendChild(d);
+}
+function showJoinBanner(channel=S.workspace.channel){
+ const ch=String(channel||"ai-tournament").replace(/^#/,"");
+ const names=[S.nick,...AI_META.map(a=>a.nick)];
+ joinSystemLine(`*** ${S.nick} joined #${ch}`,"joinEvent");
+ joinSystemLine(`*** Topic for #${ch}:`,"topicLabel");
+ joinSystemLine(S.topic,"topicText");
+ joinSystemLine(`*** Users: ${names.join(", ")}`,"userList");
+ joinSystemLine("*** Arena ready. Unavailable AIs quietly sit out. Type /help for commands.","arenaReady");
+ chat.scrollTop=chat.scrollHeight;
+}
 function projectMenu(){const cards=Object.values(S.workspace.projects).map(p=>`<div class="projectCard"><b>#${safe(p.channel)}</b><br><small>${safe(p.topic)}</small><div class="workActions"><button data-open="${safe(p.channel)}">Open</button></div></div>`).join("");wb("Projects",`<div class="workActions"><button id="newProject">＋ Start Project</button></div>${cards||"No saved projects yet."}`);$("#newProject").onclick=()=>{wb("Start Project",`<label>Project name<input id="pName"></label><label>Channel name<input id="pChannel" placeholder="project-name"></label><label>Topic<input id="pTopic"></label><label>Privacy<select id="pPrivacy"><option>public</option><option>invite-only</option><option>secret</option></select></label><button id="createProject">Create local project</button><p class="ircOffline">Undernet creation awaits the persistent IRC relay.</p>`);$("#createProject").onclick=createProject};$("#workbenchBody").onclick=e=>{if(e.target.dataset.open)openProject(e.target.dataset.open)}}
 function createProject(){const channel=$("#pChannel").value.trim().replace(/^#/,"").replace(/\s+/g,"-").toLowerCase();if(!channel)return;S.workspace.projects[channel]={name:$("#pName").value.trim()||channel,channel,topic:$("#pTopic").value.trim()||"Project channel",privacy:$("#pPrivacy").value};S.workspace.logs[channel]=S.workspace.logs[channel]||[];save();openProject(channel);$("#workbench").hidden=true;notice(`*** Local project #${channel} opened. IRC relay not connected yet.`)}
-function openProject(channel){const p=S.workspace.projects[channel];if(!p)return;S.workspace.channel=channel;S.topic=p.topic;S.history=[];chat.innerHTML="";save();render();notice(`*** ${S.nick} joined #${channel}`)}
+function openProject(channel){const p=S.workspace.projects[channel];if(!p)return;S.workspace.channel=channel;S.topic=p.topic;S.history=[];chat.innerHTML="";save();render();showJoinBanner(channel)}
 function asciiMenu(){const cards=Object.entries(S.workspace.ascii).map(([n,v])=>`<div class="asciiCard"><b>${safe(n)}</b><pre>${safe(v)}</pre><button data-ascii="${safe(n)}">Insert</button></div>`).join("");wb("Saved ASCII",`<div class="workActions"><button id="newAscii">＋ New ASCII</button></div>${cards||"ASCII folder is empty."}`);$("#newAscii").onclick=()=>{wb("ASCII Editor",`<label>Name<input id="asciiName"></label><label>Artwork<textarea id="asciiText"></textarea></label><button id="saveAscii">Save ASCII</button>`);$("#saveAscii").onclick=()=>{const n=$("#asciiName").value.trim();if(n){S.workspace.ascii[n]=$("#asciiText").value;save();asciiMenu()}}};$("#workbenchBody").onclick=e=>{if(e.target.dataset.ascii){input.value+=(input.value?"\n":"")+S.workspace.ascii[e.target.dataset.ascii];$("#workbench").hidden=true;input.focus()}}}
 function skinMenu(){wb("Skins",`<label>Skin<select id="skinPick"><option value="midnight">Midnight IRC</option><option value="classic">Classic mIRC</option><option value="amber">Amber terminal</option><option value="matrix">Matrix green</option></select></label><button id="applySkin">Apply and save</button>`);$("#skinPick").value=S.workspace.skin;$("#applySkin").onclick=()=>{S.workspace.skin=$("#skinPick").value;applySkin();save();$("#workbench").hidden=true}}
 function applySkin(){const themes={midnight:["#070b10","#d8e3eb","#60aaff"],classic:["#d5d5d5","#000080","#800000"],amber:["#100b00","#ffc247","#ff8c00"],matrix:["#000500","#6cff6c","#00aa44"]},t=themes[S.workspace.skin]||themes.midnight,r=document.documentElement.style;r.setProperty("--bg",t[0]);r.setProperty("--text",t[1]);r.setProperty("--blue",t[2])}
@@ -361,5 +378,4 @@ $("#collapseNicks").onclick=()=>{S.layout.nicksCollapsed=!S.layout.nicksCollapse
 const ua=navigator.userAgent,ios=(ua.match(/OS (\d+)[_.](\d+)/)||[]).slice(1,3).join(".");$("#deviceBadge").textContent=/iPhone|iPad|iPod/.test(ua)?`iOS ${ios||"device"}`:/Android/.test(ua)?"Android":innerWidth<700?"Mobile":"Desktop";document.documentElement.dataset.device=innerWidth<700?"mobile":"desktop";
 applySkin();applyLayout();checkProviders();
 render();
-notice(`*** ${S.nick} joined #ai-tournament`);
-notice("*** Arena ready. Unavailable AIs quietly sit out. Type /help for commands.");
+showJoinBanner(S.workspace.channel);
