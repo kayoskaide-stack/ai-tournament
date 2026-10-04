@@ -269,29 +269,55 @@ async function callGemini({ key, model, prompt, images = [] }) {
     `https://generativelanguage.googleapis.com/v1beta/models/` +
     `${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
+  let currentPrompt = prompt;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
           role: "user",
-          parts: [{ text: prompt },...images.map(image=>({inline_data:{mime_type:(image.match(/^data:([^;]+)/)||[])[1]||"image/jpeg",data:image.split(",")[1]}}))],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 300,
-      },
-    }),
-  });
+          parts: [
+            { text: currentPrompt },
+            ...images.map(image => ({
+              inline_data: {
+                mime_type: (image.match(/^data:([^;]+)/) || [])[1] || "image/jpeg",
+                data: image.split(",")[1]
+              }
+            }))
+          ]
+        }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 300 }
+      })
+    });
 
-  const data = await readJson(response, "Gemini");
-  return data?.candidates?.[0]?.content?.parts
-    ?.map((part) => part?.text || "")
-    .join("");
+    const data = await readJson(response, "Gemini");
+    const candidate = data?.candidates?.[0];
+    const text = String(candidate?.content?.parts?.map((part) => part?.text || "").join("") || "").trim();
+    const finishReason = String(candidate?.finishReason || "");
+    const looksCutOff =
+      !text ||
+      (finishReason && !["STOP", "MAX_TOKENS"].includes(finishReason)) ||
+      (text.length < 90 && !/[.!?…)'"\]]\s*$/.test(text));
+
+    if (!looksCutOff || attempt === 2) return text;
+
+    console.warn(JSON.stringify({
+      event: "gemini_incomplete_retry",
+      finishReason,
+      chars: text.length,
+      attempt
+    }));
+
+    currentPrompt = prompt +
+      "\n\nYour previous response was cut off before finishing. " +
+      "Answer the same request again from the beginning as one complete, self-contained response. " +
+      "Do not leave the final sentence unfinished.";
+  }
+
+  return "";
 }
-
 async function callClaude({ key, model, prompt }) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
