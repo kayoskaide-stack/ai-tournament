@@ -1,5 +1,5 @@
 (()=>{
-const BRAIN_TOPIC = "Welcome to Kyle's Brain Trust | One question. Many minds. Every available AI joins in to answer, challenge, and refine the ideas until the strongest response survives. Keep it respectful, lawful, and constructive. Anything outside those lines is refused and earns a kick; three kicks = ban. Think big, debate clean, and have a beautiful day.";
+const BRAIN_TOPIC = "Kyle's Brain Trust — Ask a question; every available AI may answer, challenge, and refine it. Keep it respectful, lawful, and constructive. Off-limits requests are refused. 3 kicks = ban. Think big, debate clean. Have a beautiful day.";
 
 const MODEL_DEFAULTS={
  openai:"gpt-5.6-terra",
@@ -37,9 +37,9 @@ for(const a of AI_META){
  },existingRoster);
 }
 
-if(S.brainTopicVersion!==2){
+if(S.brainTopicVersion!==3){
  S.topic=BRAIN_TOPIC;
- S.brainTopicVersion=2;
+ S.brainTopicVersion=3;
  save();
  render();
 }
