@@ -20,10 +20,18 @@ function messageFrom(data, raw, status) {
 
 function makeError(provider, model, status, message) {
   const e = new Error(`${provider} ${model} failed (HTTP ${status}): ${message}`);
-  e.status = status;
+  e.status = Number(status) || 500;
   e.provider = provider;
   e.model = model;
   return e;
+}
+
+function statusForError(e) {
+  const status = Number(e?.status || 0);
+  if (status === 402 || status === 429) return status;
+  if (status === 401 || status === 403 || status === 404) return status;
+  if (status >= 500 && status <= 599) return status;
+  return 500;
 }
 
 function imageContent(prompt, images) {
@@ -108,32 +116,6 @@ async function compat({
   throw lastError || new Error(`${provider} ${model} failed.`);
 }
 
-async function ladder(models, call) {
-  let lastError;
-
-  for (const model of models) {
-    try {
-      return await call(model);
-    } catch (e) {
-      lastError = e;
-
-      // Invalid/retired/unavailable endpoint: next model.
-      if ([400, 404, 429, 500, 502, 503, 504].includes(Number(e.status || 0))) {
-        continue;
-      }
-
-      // Authentication/billing problems on one route may still allow another.
-      if ([401, 402, 403].includes(Number(e.status || 0))) {
-        continue;
-      }
-
-      continue;
-    }
-  }
-
-  throw lastError || new Error("No free model in this ladder answered.");
-}
-
 async function callOpenRouterFree({ key, prompt, images }) {
   const result = await compat({
     key,
@@ -153,141 +135,80 @@ async function callOpenRouterFree({ key, prompt, images }) {
   };
 }
 
-async function callDeepSeek({ prompt, images }) {
-  // If native DeepSeek has credit, use it automatically.
-  if (
-    process.env.DEEPSEEK_API_KEY &&
-    Date.now() >= deepSeekNativeBlockedUntil
-  ) {
-    try {
-      const native = await compat({
-        key: process.env.DEEPSEEK_API_KEY,
-        baseUrl: "https://api.deepseek.com/v1",
-        model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
-        prompt,
-        images: [],
-        provider: "DeepSeek native",
-        maxTokens: 220,
-        retries: 0
-      });
-
-      return {
-        ...native,
-        route: "deepseek/native",
-        free: false
-      };
-    } catch (e) {
-      if ([402, 403, 429].includes(Number(e.status || 0))) {
-        deepSeekNativeBlockedUntil = Date.now() + 10 * 60 * 1000;
-      }
-      // Then fall through to genuine DeepSeek models on OpenRouter.
-    }
+async function callDeepSeek({ prompt }) {
+  if (!process.env.DEEPSEEK_API_KEY) {
+    const e = new Error("DEEPSEEK_API_KEY is not configured.");
+    e.status = 503;
+    throw e;
   }
 
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error(
-      "DeepSeek native is unavailable and OPENROUTER_API_KEY is not configured for the free DeepSeek fallback."
-    );
+  if (Date.now() < deepSeekNativeBlockedUntil) {
+    const e = new Error("DeepSeek native is temporarily rate-limited or out of funds.");
+    e.status = 429;
+    throw e;
   }
 
-  const models = [
-    "deepseek/deepseek-v4-flash-0731:free",
-    "deepseek/deepseek-v4-flash:free",
-    "deepseek/deepseek-chat-v3.1:free",
-    "deepseek/deepseek-r1:free",
-    "deepseek/deepseek-chat:free"
-  ];
-
-  const result = await ladder(models, model =>
-    compat({
-      key: process.env.OPENROUTER_API_KEY,
-      baseUrl: "https://openrouter.ai/api/v1",
-      model,
+  try {
+    const native = await compat({
+      key: process.env.DEEPSEEK_API_KEY,
+      baseUrl: "https://api.deepseek.com/v1",
+      model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
       prompt,
       images: [],
-      provider: "DeepSeek via OpenRouter",
+      provider: "DeepSeek native",
       maxTokens: 220,
-      retries: 1
-    })
-  );
+      retries: 0
+    });
 
-  return {
-    ...result,
-    route: "openrouter/deepseek-free",
-    free: true
-  };
+    return {
+      ...native,
+      route: "deepseek/native",
+      free: false
+    };
+  } catch (e) {
+    if ([402, 403, 429].includes(Number(e.status || 0))) {
+      deepSeekNativeBlockedUntil = Date.now() + 10 * 60 * 1000;
+    }
+    throw e;
+  }
 }
 
 async function callMistral({ prompt, images }) {
-  // Prefer Mistral's own Free-mode API whenever it is accepting requests.
-  if (
-    process.env.MISTRAL_API_KEY &&
-    Date.now() >= mistralNativeBlockedUntil
-  ) {
-    try {
-      const native = await compat({
-        key: process.env.MISTRAL_API_KEY,
-        baseUrl: "https://api.mistral.ai/v1",
-        model: process.env.MISTRAL_MODEL || "mistral-small-latest",
-        prompt,
-        images,
-        provider: "Mistral native",
-        maxTokens: 220,
-        retries: 1
-      });
-
-      return {
-        ...native,
-        route: "mistral/native-free",
-        free: true
-      };
-    } catch (e) {
-      if ([402, 403, 429].includes(Number(e.status || 0))) {
-        mistralNativeBlockedUntil = Date.now() + 2 * 60 * 1000;
-      }
-      // If native Free mode is throttled, use a genuine Mistral free model via OR.
-    }
+  if (!process.env.MISTRAL_API_KEY) {
+    const e = new Error("MISTRAL_API_KEY is not configured.");
+    e.status = 503;
+    throw e;
   }
 
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error(
-      "Mistral Free mode is temporarily unavailable and OPENROUTER_API_KEY is not configured for the free Mistral fallback."
-    );
+  if (Date.now() < mistralNativeBlockedUntil) {
+    const e = new Error("Mistral native Free mode is temporarily rate-limited or unavailable.");
+    e.status = 429;
+    throw e;
   }
 
-  const coding = /\b(code|coding|javascript|python|node|bash|shell|bug|repo|function|script|api)\b/i.test(prompt);
-
-  const models = coding
-    ? [
-        "mistralai/devstral-2512:free",
-        "mistralai/devstral-small:free",
-        "mistralai/mistral-nemo:free",
-        "mistralai/mistral-7b-instruct:free"
-      ]
-    : [
-        "mistralai/mistral-nemo:free",
-        "mistralai/mistral-7b-instruct:free",
-        "mistralai/devstral-2512:free"
-      ];
-
-  const result = await ladder(models, model =>
-    compat({
-      key: process.env.OPENROUTER_API_KEY,
-      baseUrl: "https://openrouter.ai/api/v1",
-      model,
+  try {
+    const native = await compat({
+      key: process.env.MISTRAL_API_KEY,
+      baseUrl: "https://api.mistral.ai/v1",
+      model: process.env.MISTRAL_MODEL || "mistral-small-latest",
       prompt,
       images,
-      provider: "Mistral via OpenRouter",
+      provider: "Mistral native",
       maxTokens: 220,
       retries: 1
-    })
-  );
+    });
 
-  return {
-    ...result,
-    route: "openrouter/mistral-free",
-    free: true
-  };
+    return {
+      ...native,
+      route: "mistral/native-free",
+      free: true
+    };
+  } catch (e) {
+    if ([402, 403, 429].includes(Number(e.status || 0))) {
+      mistralNativeBlockedUntil = Date.now() + 2 * 60 * 1000;
+    }
+    throw e;
+  }
 }
 
 export default async function handler(req, res) {
@@ -342,7 +263,7 @@ export default async function handler(req, res) {
       success: true
     });
   } catch (e) {
-    return res.status(500).json({
+    return res.status(statusForError(e)).json({
       error: e?.message || String(e),
       provider,
       success: false,
