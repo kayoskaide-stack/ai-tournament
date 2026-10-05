@@ -53,7 +53,7 @@ export default async function handler(req,res){
         error:"Architecture control key is not configured."
       });
 
-    req.braintrustUser=user;
+    req.braintrustUser=user; req.braintrustAuthorized=true;
     req.headers.authorization=`Bearer ${admin}`;
 
     audit(`architecture_${action}`,user,{
@@ -78,6 +78,6 @@ export default async function handler(req,res){
   const user=requireAccess(req,res,capability);
   if(!user)return;
 
-  req.braintrustUser=user;
+  req.braintrustUser=user; req.braintrustAuthorized=true;
   return handler(req,res);
 }
