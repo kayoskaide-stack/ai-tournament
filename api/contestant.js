@@ -535,6 +535,10 @@ Do not restrict yourself to one word.
 
 Kyle's message: ${effectiveChallenge}`;
     let text;
+    let actualModel=selectedModel;
+    let responseRoute=normalizedProvider;
+    let responseFree=false;
+    let responseLocal=false;
 
     if (normalizedProvider === "openai") {
       if (!process.env.OPENAI_API_KEY) {
@@ -614,17 +618,137 @@ Kyle's message: ${effectiveChallenge}`;
         reasoning,
       });
     } else if (normalizedProvider === "xai") {
-      if (!process.env.XAI_API_KEY) {
-        return res.status(503).json({ error: "XAI_API_KEY is not configured." });
+
+      // === LATITUDE_GROK_WORKER_V1 ===
+
+      const workerUrl=
+        String(process.env.GROK_WORKER_URL||"")
+        .replace(/\/+$/,"");
+
+      const workerKey=
+        String(process.env.ARENA_RELAY_KEY||"");
+
+      let workerError=null;
+
+      /*
+       * First choice:
+       * Kyle's authenticated Grok Build CLI
+       * running headlessly on the antiX Latitude.
+       */
+      if(workerUrl && workerKey){
+
+        try{
+
+          const controller=new AbortController();
+
+          const timer=setTimeout(
+            ()=>controller.abort(),
+            75000
+          );
+
+          let response;
+
+          try{
+
+            response=await fetch(
+              workerUrl+"/ask",
+              {
+                method:"POST",
+
+                headers:{
+                  Authorization:"Bearer "+workerKey,
+                  "Content-Type":"application/json",
+                  Accept:"application/json"
+                },
+
+                body:JSON.stringify({
+                  prompt
+                }),
+
+                signal:controller.signal
+              }
+            );
+
+          }finally{
+            clearTimeout(timer);
+          }
+
+          const data=
+            await readJson(
+              response,
+              "Latitude Grok"
+            );
+
+          text=
+            data?.guess ||
+            data?.answer ||
+            data?.reply ||
+            data?.text ||
+            data?.content ||
+            "";
+
+          if(!String(text||"").trim())
+            throw new Error(
+              "Latitude Grok returned no readable answer."
+            );
+
+          actualModel=
+            data?.model ||
+            "grok-build";
+
+          responseRoute=
+            data?.route ||
+            "latitude/grok-build";
+
+          responseFree=
+            data?.free !== false;
+
+          responseLocal=true;
+
+        }catch(error){
+
+          workerError=error;
+
+        }
       }
 
-      text = await callOpenAICompatible({
-        key: process.env.XAI_API_KEY,
-        model: selectedModel,
-        prompt,
-        baseUrl: "https://api.x.ai/v1",
-        provider: "xAI",
-      });
+
+      /*
+       * Second choice:
+       * regular paid xAI API if one exists.
+       *
+       * This means the Latitude can be free/local now,
+       * while funded xAI can later become the always-online
+       * fallback without redesigning anything.
+       */
+      if(!text){
+
+        if(!process.env.XAI_API_KEY){
+
+          const detail=
+            workerError instanceof Error
+              ? workerError.message
+              : "worker unavailable";
+
+          throw new Error(
+            "Latitude Grok offline: "+detail
+          );
+        }
+
+        text=await callOpenAICompatible({
+          key:process.env.XAI_API_KEY,
+          model:selectedModel,
+          prompt,
+          baseUrl:"https://api.x.ai/v1",
+          provider:"xAI",
+        });
+
+        actualModel=selectedModel;
+        responseRoute="xai/api";
+        responseFree=false;
+        responseLocal=false;
+      }
+
     } else if (normalizedProvider === "duck") {
       return res.status(503).json({
         error:
@@ -643,17 +767,22 @@ Kyle's message: ${effectiveChallenge}`;
       JSON.stringify({
         event: "contestant_success",
         provider: normalizedProvider,
-        model: selectedModel,
+        model: actualModel,
         guess,
         latency,
+        route: responseRoute,
+        local: responseLocal,
       })
     );
 
     return res.status(200).json({
       guess,
       provider: normalizedProvider,
-      model: selectedModel,
+      model: actualModel,
       latency,
+      route: responseRoute,
+      free: responseFree,
+      local: responseLocal,
       success: true,
     });
   } catch (error) {

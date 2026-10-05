@@ -1,4 +1,5 @@
 (()=>{
+  // === LATITUDE_GROK_UI_V1 ===
   const DAY=()=>new Date().toISOString().slice(0,10);
   const OR_LIMIT=45; // keep ~5 calls in reserve from the current 50/day free plan
 
@@ -40,6 +41,25 @@
       S.profiles.xai||{},
       {model:"grok-4.3"}
     );
+
+    const xaiState=S.providerState?.xai;
+
+    if(
+      xaiState &&
+      ["out","rate","err","off"].includes(
+        xaiState.status
+      )
+    ){
+      S.providerState.xai=
+        Object.assign(
+          {},
+          xaiState,
+          {
+            status:"ready",
+            reason:"Latitude route armed"
+          }
+        );
+    }
 
     for(const key of ["deepseek","mistral","openrouter"]){
       const st=S.providerState?.[key];
@@ -156,10 +176,50 @@
       if(a.key==="anthropic" && st.status==="out"){
         ensureBadge(row,"SLEEP","sleep","Claude is ready for Haiku 4.5 when API credit is available.");
         mini.textContent="Haiku 4.5";
-      }else if(a.key==="xai" && !providerReady.xai){
-        ensureBadge(row,"SLEEP","sleep","Grok is wired for Grok 4.3; xAI API key/credit is still needed.");
-        mini.textContent="Grok 4.3";
-      }else if(["deepseek","mistral","openrouter"].includes(a.key)){
+      }else if(
+        a.key==="xai" &&
+        st.route==="latitude/grok-build"
+      ){
+
+        if(providerReady.xai){
+
+          ensureBadge(
+            row,
+            "LOCAL",
+            "free",
+            "Grok Build is running headlessly on Kyle's Latitude."
+          );
+
+        }else{
+
+          row.querySelector(
+            ".freeLifeBadge"
+          )?.remove();
+
+        }
+
+        mini.textContent=
+          "Grok Build";
+
+      }else if(
+        a.key==="xai" &&
+        !providerReady.xai
+      ){
+
+        ensureBadge(
+          row,
+          "SLEEP",
+          "sleep",
+          "Start the Latitude Grok worker or fund the xAI API."
+        );
+
+        mini.textContent=
+          "Grok 4.3";
+
+      }else if(
+        ["deepseek","mistral","openrouter"]
+        .includes(a.key)
+      ){
         if(st.status==="ready"){
           ensureBadge(row,"FREE","free",st.route||"FREE-LIFE");
         }
