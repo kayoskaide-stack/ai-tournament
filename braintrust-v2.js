@@ -18,26 +18,16 @@ const PERSONAS={
  xai:"You are Grok, xAI's Brain Trust contestant: sharp, curious, witty, and willing to challenge assumptions.",
  deepseek:"You are DeepSeek, the Brain Trust's analytical problem-solver: technical, efficient, and evidence-minded.",
  mistral:"You are Mistral, the Brain Trust's fast European contestant: practical, concise, and independently minded.",
- openrouter:"You are OpenRouter, the Brain Trust's routing-seat contestant: compare approaches, spot gaps, and add the strongest useful angle."
+ openrouter:"You are OpenRouter, the Brain Trust's honest generic free-seat contestant: compare approaches, spot gaps, and add the strongest useful angle."
 };
 
-// === FREE_LIFE_ROUTING_V1 ===
 const FREE_LIFE_PROVIDERS=new Set(["deepseek","mistral","openrouter"]);
 
 for(const a of AI_META){
  const existingProfile=S.profiles[a.key]||{};
- S.profiles[a.key]=Object.assign({},profileDefaults,{
-   model:MODEL_DEFAULTS[a.key],
-   plan:"auto"
- },existingProfile);
-
+ S.profiles[a.key]=Object.assign({},profileDefaults,{model:MODEL_DEFAULTS[a.key],plan:"auto"},existingProfile);
  const existingRoster=S.roster[a.key]||{};
- S.roster[a.key]=Object.assign({
-   nick:a.nick,
-   state:"present",
-   charLimit:700,
-   partReason:"Temporarily unavailable."
- },existingRoster);
+ S.roster[a.key]=Object.assign({nick:a.nick,state:"present",charLimit:700,partReason:"Temporarily unavailable."},existingRoster);
 }
 
 if(S.brainTopicVersion!==3){
@@ -49,89 +39,61 @@ if(S.brainTopicVersion!==3){
 
 function classifyProviderError(message){
  const m=String(message||"").toLowerCase();
- const out=/insufficient balance|payment required|billing|credit|credits|funds|quota|\b402\b/.test(m);
- const rate=!out&&(/rate limit|rate limited|\b429\b/.test(m));
- const off=!out&&!rate&&(/api[_ -]?key|not configured|missing configuration/.test(m));
- return {
-   status:out?"out":rate?"rate":off?"off":"err",
-   label:out?"OUT":rate?"RATE":off?"OFF":"ERR",
-   reason:out?"out of funds":rate?"rate limited":off?"not configured":"unavailable"
- };
+ const out=/insufficient balance|out of balance|payment required|billing|credit|credits|funds|quota|\b402\b/.test(m);
+ const rate=!out&&(/rate limit|rate limited|too many requests|\b429\b/.test(m));
+ const off=!out&&!rate&&(/api[_ -]?key|not configured|missing configuration|unauthorized|\b401\b/.test(m));
+ return {status:out?"out":rate?"rate":off?"off":"err",label:out?"OUT":rate?"RATE":off?"OFF":"ERR",reason:out?"out of funds":rate?"rate limited":off?"not configured":"unavailable"};
 }
 
 compactError=function(nick,message){
  const info=classifyProviderError(message);
  const key=providerKeyForNick(nick);
-
  if(key){
-  S.providerState[key]=Object.assign(
-   {},
-   S.providerState[key]||{},
-   {status:info.status,reason:info.reason}
-  );
+  S.providerState[key]=Object.assign({},S.providerState[key]||{},{status:info.status,reason:info.reason,lastError:String(message||"").slice(0,500)});
+  if(["out","rate","off"].includes(info.status))providerReady[key]=false;
   save();
   render();
   renderProviderStatus();
  }
-
- const box=document.createElement("details");
- box.className="providerError";
- box.innerHTML=
-  `<summary><span class="time">${time()}</span> ⚠ ${safe(nick)} ${info.label}. <span class="tapReason">tap reason</span></summary>`+
-  `<div>${safe(String(message||"Unknown provider error").slice(0,900))}</div>`;
-
- chat.appendChild(box);
- chat.scrollTop=chat.scrollHeight;
 };
+
+function stripAddressedName(text,meta){
+ const labels=[meta.nick,...meta.prefixes].map(x=>String(x).replace(/[^A-Za-z0-9 _@.-]/g,"\\$&"));
+ const re=new RegExp("^\\s*@?(?:"+labels.join("|")+")(?:\\s*[:,>-]|\\s+)","i");
+ return String(text||"").replace(re,"").trim()||String(text||"").trim();
+}
+
+function addressedAI(text){
+ const raw=String(text||"");
+ for(const a of AI_META){
+  const labels=[a.nick,...a.prefixes].map(x=>String(x).replace(/[^A-Za-z0-9 _@.-]/g,"\\$&"));
+  const re=new RegExp("^\\s*@?(?:"+labels.join("|")+")(?:\\s*[:,>-]|\\s+)","i");
+  if(re.test(raw))return {meta:a,text:stripAddressedName(raw,a)};
+ }
+ return null;
+}
 
 async function brainAsk(provider,nick,userText,images=[]){
  const roster=S.roster[provider];
  if(!roster)return;
-
  nick=roster.nick||nick;
-
  if(!active(provider)||S.banned[nick])return;
-
- if(
-   ["quiet","mention"].includes(roster.state) &&
-   !String(userText).toLowerCase().includes(roster.nick.toLowerCase())
- ) return;
-
+ if(["quiet","mention"].includes(roster.state)&&!String(userText).toLowerCase().includes(roster.nick.toLowerCase()))return;
  const profile=S.profiles[provider]||profileDefaults;
  const plan=profile.plan||"auto";
-
- if(
-   plan==="off" ||
-   !providerReady[provider] ||
-   (
-    S.providerState?.[provider]?.status==="out" &&
-    !FREE_LIFE_PROVIDERS.has(provider)
-   )
- ) return;
-
- if(
-   typeof freeLifeCanCall==="function" &&
-   !freeLifeCanCall(provider)
- ) return;
-
+ const st=S.providerState?.[provider]?.status||"ready";
+ if(plan==="off"||!providerReady[provider]||["out","rate","off"].includes(st))return;
+ if(typeof freeLifeCanCall==="function"&&!freeLifeCanCall(provider))return;
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])return;
 
  const typing=document.createElement("div");
  typing.className="typing";
  typing.textContent=`${nick} is thinking…`;
-
  chat.appendChild(typing);
  chat.scrollTop=chat.scrollHeight;
 
- const recent=S.history
-   .slice(-14)
-   .map(x=>`${x.nick}: ${x.text}`)
-   .join("\n");
-
- const persona=
-   PERSONAS[provider] ||
-   `You are ${nick}, an independent AI contestant in Kyle's Brain Trust.`;
-
+ const recent=S.history.slice(-14).map(x=>`${x.nick}: ${x.text}`).join("\n");
+ const persona=PERSONAS[provider]||`You are ${nick}, an independent AI contestant in Kyle's Brain Trust.`;
  const prompt=`${persona}
 
 You are speaking inside #ai-tournament, Kyle's Brain Trust.
@@ -151,11 +113,7 @@ the app renders your nickname separately.
 
 Reply language: ${profile.language==="auto"?"match Kyle's language":profile.language}.
 
-${profile.length==="tiny"
- ?"Keep the entire reply to 1–3 short sentences (about 60 words maximum)."
- :profile.length==="short"
- ?"Keep the reply concise, normally under 120 words."
- :"Use only as much detail as needed."}
+${profile.length==="tiny"?"Keep the entire reply to 1–3 short sentences (about 60 words maximum).":profile.length==="short"?"Keep the reply concise, normally under 120 words.":"Use only as much detail as needed."}
 
 Hard limit: ${roster.charLimit||700} characters.
 
@@ -166,82 +124,24 @@ ${recent}
 
 Current Brain Trust task:
 ${userText}`;
-
  try{
-  const endpoint=FREE_LIFE_PROVIDERS.has(provider)
-   ?"/api/free-life"
-   :"/api/contestant";
-
-  const res=await fetch(endpoint,{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({
-    provider,
-    model:profile.model,
-    reasoning:profile.reasoning,
-    challenge:prompt,
-    images,
-    mode:"chat"
-   })
-  });
-
+  const endpoint=FREE_LIFE_PROVIDERS.has(provider)?"/api/free-life":"/api/contestant";
+  const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider,model:profile.model,reasoning:profile.reasoning,challenge:prompt,images,mode:"chat"})});
   const data=await res.json().catch(()=>({}));
-
-  if(!res.ok)
-   throw Error(data.error||`HTTP ${res.status}`);
-
-  let answer=
-   data.guess||
-   data.answer||
-   data.text||
-   data.output||
-   data.response||
-   data.content||
-   data.result||
-   data.reply;
-
-  if(answer&&typeof answer!=="string")
-   answer=JSON.stringify(answer);
-
-  if(!answer)
-   throw Error("No readable message returned");
-
-  answer=String(answer).slice(
-   0,
-   Math.max(80,Number(roster.charLimit)||700)
-  );
-
+  if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
+  let answer=data.guess||data.answer||data.text||data.output||data.response||data.content||data.result||data.reply;
+  if(answer&&typeof answer!=="string")answer=JSON.stringify(answer);
+  if(!answer)throw Error("No readable message returned");
+  answer=String(answer).slice(0,Math.max(80,Number(roster.charLimit)||700));
   typing.remove();
-
-  S.providerState[provider]=Object.assign(
-   {},
-   S.providerState[provider]||{},
-   {
-    status:"ready",
-    reason:data.route||"",
-    model:data.model||profile.model||"",
-    route:data.route||provider,
-    free:Boolean(data.free)
-   }
-  );
-
-  if(typeof freeLifeRecord==="function")
-   freeLifeRecord(provider,data);
-
+  providerReady[provider]=true;
+  S.providerState[provider]=Object.assign({},S.providerState[provider]||{},{status:"ready",reason:data.route||"",model:data.model||profile.model||"",route:data.route||provider,free:Boolean(data.free)});
+  if(typeof freeLifeRecord==="function")freeLifeRecord(provider,data);
   add("message",nick,answer);
-
-  if(
-   (nick==="PrincessGPT"||nick==="Gemmy") &&
-   S.settings.radioVoices
-  ){
-   await radioSpeak(nick,answer);
-  }
-
+  if((nick==="PrincessGPT"||nick==="Gemmy")&&S.settings.radioVoices)await radioSpeak(nick,answer);
   render();
   renderProviderStatus();
-
   return answer;
-
  }catch(e){
   typing.remove();
   compactError(nick,e.message);
@@ -253,173 +153,82 @@ ask=brainAsk;
 const legacySend=send;
 
 send=async function(spokenText=""){
-
- if(spokenText&&typeof spokenText==="object")
-  spokenText="";
-
+ if(spokenText&&typeof spokenText==="object")spokenText="";
  const raw=String(spokenText||input.value).trim();
-
- if(!raw&&!pendingImages.length)
-  return;
+ if(!raw&&!pendingImages.length)return;
 
  if(/^\/models?(?:\s|$)/i.test(raw)){
   const wanted=raw.replace(/^\/models?\s*/i,"").trim().toLowerCase();
-  const rows=AI_META
-   .filter(a=>!wanted||a.nick.toLowerCase()===wanted||a.key===wanted)
-   .map(a=>{
-    const st=S.providerState?.[a.key]||{};
-    const configured=S.profiles?.[a.key]?.model||"unknown";
-    const model=st.model||configured;
-    const route=st.route||st.reason||a.provider;
-    const mode=st.free?"FREE":(st.status||"ready").toUpperCase();
-    return `${a.nick}: ${model} · ${route} · ${mode}`;
-   });
+  const rows=AI_META.filter(a=>!wanted||a.nick.toLowerCase()===wanted||a.key===wanted).map(a=>{
+   const st=S.providerState?.[a.key]||{};
+   const configured=S.profiles?.[a.key]?.model||"unknown";
+   const model=st.model||configured;
+   const route=st.route||st.reason||a.provider;
+   const mode=st.free?"FREE":(st.status||"ready").toUpperCase();
+   return `${a.nick}: ${model} · ${route} · ${mode}`;
+  });
   rows.forEach(x=>notice(`*** ${x}`));
   input.value="";
   return;
  }
 
- if(raw.startsWith("/")||raw.startsWith("!"))
-  return legacySend(raw);
-
+ if(raw.startsWith("/")||raw.startsWith("!"))return legacySend(raw);
  input.value="";
-
  const images=pendingImages.slice();
-
- const requestText=
-  raw||
-  `Please examine these ${images.length} picture${images.length===1?"":"s"}.`;
-
- add(
-  "message",
-  S.nick,
-  raw||`📷 ${images.length} picture${images.length===1?"":"s"}`
- );
-
+ const addressed=addressedAI(raw);
+ const requestText=addressed?(addressed.text||raw):(raw||`Please examine these ${images.length} picture${images.length===1?"":"s"}.`);
+ add("message",S.nick,raw||`📷 ${images.length} picture${images.length===1?"":"s"}`);
  pendingImages=[];
  renderPhotoTray();
 
  if(images.length){
   const box=document.createElement("div");
   box.className="attachment multi";
-
-  images.forEach((src,i)=>{
-   const img=document.createElement("img");
-   img.src=src;
-   img.alt=`Kyle's uploaded picture ${i+1}`;
-   box.appendChild(img);
-  });
-
+  images.forEach((src,i)=>{const img=document.createElement("img");img.src=src;img.alt=`Kyle's uploaded picture ${i+1}`;box.appendChild(img)});
   chat.appendChild(box);
   chat.scrollTop=chat.scrollHeight;
  }
 
  const button=$("#send");
-
  button.disabled=true;
  arenaBusy=true;
-
- const pause=ms=>
-  new Promise(resolve=>setTimeout(resolve,ms));
-
+ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  try{
-
   await checkProviders();
-
-  const available=AI_META.filter(a=>{
+  const isAvailable=a=>{
    const profile=S.profiles[a.key]||{};
-   const state=
-    S.providerState?.[a.key]?.status||"ready";
-
-   return (
-    providerReady[a.key] &&
-    profile.plan!=="off" &&
-    active(a.key) &&
-    state!=="out" &&
-    state!=="off"
-   );
-  });
-
+   const state=S.providerState?.[a.key]?.status||"ready";
+   return providerReady[a.key]&&profile.plan!=="off"&&active(a.key)&&!["out","off","rate"].includes(state);
+  };
+  const available=addressed?[addressed.meta].filter(isAvailable):AI_META.filter(isAvailable);
   if(!available.length){
-   notice(
-    "⚠ Brain Trust has no available AI providers right now.",
-    "error"
-   );
+   if(addressed)notice(`⚠ ${addressed.meta.nick} is unavailable and will sit out.`,"error");
+   else notice("⚠ Brain Trust has no available AI providers right now.","error");
    return;
   }
-
   const transcript=[];
-
   for(let i=0;i<available.length;i++){
-
    const a=available[i];
-
-   const prior=transcript
-    .slice(-4)
-    .map(x=>`${x.nick}: ${x.answer}`)
-    .join("\n");
-
-   const task=
-    i===0
-    ?`Kyle asked: ${requestText}
-Give your strongest useful answer.`
-    :`Kyle asked: ${requestText}
-
-Brain Trust answers so far:
-${prior||"(none yet)"}
-
-Now contribute as ${a.nick}.
-Improve the answer, challenge a weak point,
-correct an error, or add an important missing angle.
-
-If the existing answer is already strong,
-explain briefly why and add only genuinely useful information.`;
-
-   const answer=
-    await brainAsk(
-     a.key,
-     a.nick,
-     task,
-     images
-    );
-
-   if(answer)
-    transcript.push({
-     nick:a.nick,
-     answer
-    });
-
+   const prior=transcript.slice(-4).map(x=>`${x.nick}: ${x.answer}`).join("\n");
+   const task=addressed
+    ?`Kyle directly addressed ${a.nick}: ${requestText}\nAnswer this turn by yourself. Do not invite the whole Brain Trust unless Kyle asks.`
+    :i===0
+     ?`Kyle asked: ${requestText}\nGive your strongest useful answer.`
+     :`Kyle asked: ${requestText}\n\nBrain Trust answers so far:\n${prior||"(none yet)"}\n\nNow contribute as ${a.nick}.\nImprove the answer, challenge a weak point,\ncorrect an error, or add an important missing angle.\n\nIf the existing answer is already strong,\nexplain briefly why and add only genuinely useful information.`;
+   const answer=await brainAsk(a.key,a.nick,task,images);
+   if(answer)transcript.push({nick:a.nick,answer});
    if(i<available.length-1){
-
-    const delay=
-     S.admin.humanPace
-      ?Math.min(
-        2500,
-        Math.max(
-         500,
-         Number(S.admin.replyDelay||1)*1000
-        )
-       )
-      :650;
-
+    const delay=S.admin.humanPace?Math.min(2500,Math.max(500,Number(S.admin.replyDelay||1)*1000)):650;
     await pause(delay);
    }
   }
-
  }finally{
-
   button.disabled=false;
   arenaBusy=false;
   input.focus();
-
-  if(liveWanted)
-   setTimeout(startLiveListening,500);
+  if(liveWanted)setTimeout(startLiveListening,500);
  }
 };
 
-checkProviders().then(()=>{
- render();
- renderProviderStatus();
-});
-
+checkProviders().then(()=>{render();renderProviderStatus();});
 })();
