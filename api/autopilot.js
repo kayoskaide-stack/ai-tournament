@@ -63,7 +63,7 @@ async function codex(task,files){
     headers:{"Content-Type":"application/json","x-goog-api-key":key},
     body:JSON.stringify({
      contents:[{role:"user",parts:[{text:prompt}]}],
-     generationConfig:{responseMimeType:"application/json",maxOutputTokens:16384}
+     generationConfig:{responseMimeType:"application/json",maxOutputTokens:32768}
     })
    }
   );
