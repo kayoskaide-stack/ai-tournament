@@ -31,6 +31,7 @@ let reconnectTimer = null;
 let shuttingDown = false;
 let lastReplyAt = 0;
 let replyBusy = false;
+const cservicePending = new Map();
 
 function tournamentDelayMs() {
   const who = `${cfg.persona} ${cfg.provider}`.toLowerCase();
@@ -82,6 +83,70 @@ function safeIrcText(s) {
     .replace(/[\r\n]+/g, " ")
     .replace(/\x00/g, "")
     .trim();
+}
+function isXPrefix(prefix) {
+  const p = String(prefix || "").toLowerCase();
+  return p === "x" || p.startsWith("x!") || p.startsWith("x@");
+}
+
+async function reportCserviceResult(pending, result) {
+  try {
+    const r = await fetch(`${cfg.arena}/api/cservice?action=relay-verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${cfg.relayKey}`
+      },
+      body: JSON.stringify({
+        challenge: pending.challenge,
+        ircNick: pending.nick,
+        verified: Boolean(result.verified),
+        cserviceUsername: result.username || ""
+      })
+    });
+    const raw = await r.text();
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${raw.slice(0, 180)}`);
+    log("cservice_callback_ok", {
+      nick: pending.nick,
+      challenge: pending.challenge,
+      verified: Boolean(result.verified),
+      username: result.username || null
+    });
+  } catch (err) {
+    log("cservice_callback_error", {
+      nick: pending.nick,
+      challenge: pending.challenge,
+      error: err?.message || String(err)
+    });
+  }
+}
+
+function handleXVerifyReply(text) {
+  const line = safeIrcText(text);
+  const subject = line.match(/(?:^|\s)([^\s!]+)!/)?.[1] || "";
+  if (!subject) return false;
+  const key = subject.toLowerCase();
+  const pending = cservicePending.get(key);
+  if (!pending) return false;
+  if (Date.now() - pending.at > 10 * 60 * 1000) {
+    cservicePending.delete(key);
+    return true;
+  }
+
+  if (/\bis NOT logged in\b/i.test(line)) {
+    cservicePending.delete(key);
+    send(`NOTICE ${pending.nick} :X says you are not logged into a CService username yet. Log into X, then run !verify ${pending.challenge} again.`);
+    reportCserviceResult(pending, { verified: false });
+    return true;
+  }
+
+  const match = line.match(/\blogged in as\s+([A-Za-z0-9][A-Za-z0-9_.-]{1,31})/i);
+  if (!match) return false;
+  const username = match[1];
+  cservicePending.delete(key);
+  send(`NOTICE ${pending.nick} :CService verified as ${username}. Return to Brain Trust; it should unlock automatically.`);
+  reportCserviceResult(pending, { verified: true, username });
+  return true;
 }
 function splitForIrc(text) {
   const clean = safeIrcText(text);
@@ -398,6 +463,9 @@ function handle(line) {
   const msg = parseLine(line);
   if (!msg) return;
   log("irc_in", { line });
+  if ((msg.command === "NOTICE" || msg.command === "PRIVMSG") && isXPrefix(msg.prefix)) {
+    if (handleXVerifyReply(msg.trailing || "")) return;
+  }
   if (msg.command === "PING") {
     const token =
       msg.trailing ||
@@ -458,6 +526,15 @@ function handle(line) {
       msg.trailing || "";
 
     const speaker = nickFromPrefix(msg.prefix);
+    const verifyMatch = String(text || "").trim().match(/^!verify\s+([a-f0-9]{10})$/i);
+    if (verifyMatch && target.toLowerCase() === cfg.channel.toLowerCase()) {
+      const challenge = verifyMatch[1].toLowerCase();
+      cservicePending.set(speaker.toLowerCase(), { challenge, nick: speaker, at: Date.now() });
+      send(`NOTICE ${speaker} :Checking your logged-in CService identity with X…`);
+      send(`PRIVMSG X@channels.undernet.org :VERIFY ${speaker}`);
+      log("cservice_verify_requested", { nick: speaker, challenge });
+      return;
+    }
 
     if (
       text &&
