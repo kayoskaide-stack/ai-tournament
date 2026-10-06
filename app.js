@@ -254,7 +254,7 @@ async function send(spokenText=""){
   if(raw.startsWith("!catchup")||raw.startsWith("!reingest")){const log=S.workspace.logs[S.workspace.channel]||[],n=raw.includes("full")?log.length:Math.min(40,log.length),digest=log.slice(-n).map(x=>`${x.nick}: ${x.text}`).join("\n");return send(`Project catch-up from the last ${n} logged messages:\n${digest}`)}
   if(raw.startsWith("!really?")){const log=S.workspace.logs[S.workspace.channel]||[],last=[...log].reverse().find(x=>x.nick!==S.nick);return send(`FACT-CHECK COURT: Independently review this last participant statement. Identify claims as confirmed, likely, uncertain, suspected hallucination, or demonstrably false. Give a short reason. Do not kick anyone automatically. Statement by ${last?.nick||"unknown"}: ${last?.text||"No prior statement."}`)}
   if(raw==="!specialists"){Object.entries(S.specialists).forEach(([k,v])=>notice(`${v.enabled?"●":"○"} ${k} — ${v.nick}: ${v.status}`));return}
-  if(raw.startsWith("!build ")){add("message",S.nick,raw);return startBuild(raw.slice(7).trim())}
+  if(raw.startsWith("!build ")||raw.startsWith("/propose ")){const task=raw.startsWith("!build ")?raw.slice(7).trim():raw.slice(9).trim();add("message",S.nick,raw);return startBuild(task)}
   if(raw==="!autopilot"){notice("Auto-Pilot: !build request · !deploy · !reject · !rollback. Every build creates a verified backup and PR preview first.");return}
   if(raw==="!deploy"&&S.autopilot.lastPr){try{const d=await pilot("approve",{pr:S.autopilot.lastPr});notice(`✅ ${d.message}`)}catch(e){notice(`🛑 Deploy blocked — ${e.message}`,"error")}return}
   if(raw==="!reject"&&S.autopilot.lastPr){try{const d=await pilot("reject",{pr:S.autopilot.lastPr});notice(`🛑 ${d.message}`)}catch(e){notice(e.message,"error")}return}
