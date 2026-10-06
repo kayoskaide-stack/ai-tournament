@@ -20,11 +20,77 @@ async function file(path,ref){
  const d=await gh(`/contents/${path}?ref=${encodeURIComponent(ref)}`);return {path,sha:d.sha,content:Buffer.from(d.content||"","base64").toString("utf8")};
 }
 async function codex(task,files){
- if(!process.env.OPENAI_API_KEY)throw Error("OPENAI_API_KEY is not configured");
  const prompt=`You are CodeSavant, a careful coding specialist for a small vanilla JavaScript Vercel application. Implement the operator request using the supplied repository files. Return JSON only with keys summary and files. files is an array of complete replacement files, each having path and content. Change the minimum number of files. Never output secrets, credentials, workflow files, binary files, or deletions. Preserve existing behavior, mobile layout, admin authentication, rigorous backup/preview/approval flow, and fail-closed safety. Every JavaScript file must parse.\n\nOPERATOR REQUEST:\n${task}\n\nFILES:\n${files.map(f=>`--- ${f.path} ---\n${f.content}`).join("\n")}`;
- const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({model:process.env.ARENA_CODER_MODEL||"gpt-5.5",messages:[{role:"user",content:prompt}],reasoning_effort:"low",response_format:{type:"json_object"},max_completion_tokens:24000})}),raw=await r.text();
- let d={};try{d=JSON.parse(raw)}catch{}if(!r.ok)throw Error(`Coding model ${r.status}: ${d?.error?.message||raw.slice(0,180)}`);
- const text=d?.choices?.[0]?.message?.content;if(!text)throw Error("Coding model returned no patch");let out;try{out=JSON.parse(text)}catch{throw Error("Coding model returned invalid JSON")};return out;
+
+ function parseResult(text,provider){
+  let cleaned=String(text||"").trim();
+  cleaned=cleaned.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");
+  if(!cleaned)throw Error(`${provider} coding model returned no patch`);
+  let out;
+  try{out=JSON.parse(cleaned)}
+  catch{throw Error(`${provider} coding model returned invalid JSON`)}
+  if(!out||!Array.isArray(out.files))throw Error(`${provider} coding model returned an invalid patch object`);
+  return out;
+ }
+
+ async function openai(){
+  if(!process.env.OPENAI_API_KEY)throw Error("OPENAI_API_KEY is not configured");
+  const r=await fetch("https://api.openai.com/v1/chat/completions",{
+   method:"POST",
+   headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,"Content-Type":"application/json"},
+   body:JSON.stringify({
+    model:process.env.ARENA_CODER_MODEL||"gpt-5.5",
+    messages:[{role:"user",content:prompt}],
+    reasoning_effort:"low",
+    response_format:{type:"json_object"},
+    max_completion_tokens:24000
+   })
+  });
+  const raw=await r.text();
+  let d={};try{d=JSON.parse(raw)}catch{}
+  if(!r.ok)throw Error(`OpenAI coding model ${r.status}: ${d?.error?.message||raw.slice(0,180)}`);
+  return parseResult(d?.choices?.[0]?.message?.content,"OpenAI");
+ }
+
+ async function gemini(){
+  const key=process.env.GEMINI_API_KEY;
+  if(!key)throw Error("GEMINI_API_KEY is not configured");
+  const model=process.env.GEMINI_CODER_MODEL||process.env.GEMINI_FREE_MODEL||process.env.GEMINI_MODEL||"gemini-3.5-flash-lite";
+  const r=await fetch(
+   `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+   {
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body:JSON.stringify({
+     contents:[{role:"user",parts:[{text:prompt}]}],
+     generationConfig:{responseMimeType:"application/json",maxOutputTokens:16384}
+    })
+   }
+  );
+  const raw=await r.text();
+  let d={};try{d=JSON.parse(raw)}catch{}
+  if(!r.ok)throw Error(`Gemini coding model ${r.status}: ${d?.error?.message||raw.slice(0,180)}`);
+  const text=(d?.candidates?.[0]?.content?.parts||[]).map(x=>x?.text||"").join("");
+  return parseResult(text,`Gemini ${model}`);
+ }
+
+ let openaiError=null;
+ if(process.env.OPENAI_API_KEY){
+  try{return await openai()}
+  catch(e){
+   openaiError=e;
+   console.warn("CodeSavant OpenAI unavailable; trying Gemini:",e?.message||e);
+  }
+ }
+ if(process.env.GEMINI_API_KEY){
+  try{return await gemini()}
+  catch(e){
+   if(openaiError)throw Error(`${openaiError.message}; Gemini fallback also failed: ${e?.message||e}`);
+   throw e;
+  }
+ }
+ if(openaiError)throw openaiError;
+ throw Error("No CodeSavant provider configured: set OPENAI_API_KEY or GEMINI_API_KEY");
 }
 async function propose(task,requester="Kyle"){
  task=String(task||"").trim();if(task.length<8||task.length>1800)throw Error("Build request must be 8–1800 characters");
