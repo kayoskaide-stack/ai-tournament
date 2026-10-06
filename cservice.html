@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Brain Trust — Undernet identity check</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#071019;color:#d9e3ea;font-family:Menlo,Monaco,Consolas,monospace;display:grid;place-items:center;padding:18px}.card{width:min(560px,96vw);background:#0b151f;border:1px solid #35516b;border-radius:14px;padding:20px;box-shadow:0 18px 80px #0009}h1{font-size:21px;color:#f0c85b;margin:0 0 8px}.sub{color:#9fb3c3;font-size:12px;line-height:1.55}.step{border-left:2px solid #35516b;padding:10px 12px;margin:12px 0;background:#08111a;font-size:12px;line-height:1.55}.step b{color:#b9dcf6}a,button{font:700 12px Menlo,monospace}.btn{display:block;width:100%;border:1px solid #4b7395;border-radius:8px;background:#163a58;color:#fff;text-align:center;padding:12px;text-decoration:none;margin:9px 0;cursor:pointer}.btn.secondary{background:#0d202f}.btn:disabled{opacity:.45;cursor:not-allowed}code{display:block;overflow-wrap:anywhere;background:#03080c;border:1px solid #294155;border-radius:7px;padding:10px;color:#eaf4fb;margin:8px 0}.warn{color:#ffcf78}.ok{color:#8de1a8}.bad{color:#ff8792}#status{min-height:32px;font-size:12px;line-height:1.5;margin-top:10px}.tiny{font-size:10px;color:#7890a3;line-height:1.45}</style>
+</head>
+<body>
+<main class="card">
+<h1>Brain Trust identity check</h1>
+<p class="sub">Your email has been confirmed. One last step proves you have a registered Undernet CService username before the Brain Trust opens.</p>
+<div class="step"><b>1 · Need a CService username?</b><br>Open the official CService site and choose <b>Register!</b>. Undernet registers usernames, not IRC nicknames.</div>
+<a class="btn secondary" href="https://cservice.undernet.org/" target="_blank" rel="noopener">OPEN OFFICIAL CSERVICE SITE</a>
+<div class="step"><b>2 · Log into X in your IRC client</b><br>Connect to Undernet, then use:<code>/msg X@channels.undernet.org LOGIN your_username your_password</code><span class="warn">Enter that password only in your IRC client. Brain Trust never asks for or receives it.</span></div>
+<div class="step"><b>3 · Prove it with X</b><br>Join <b>#ai-tournament</b>, create a one-time check below, then paste the command into the channel. PrincessGPT asks X to VERIFY your nickname and the browser unlocks automatically.</div>
+<button id="start" class="btn">CREATE ONE-TIME CHECK</button>
+<section id="challenge" hidden><div class="tiny">Paste this in #ai-tournament:</div><code id="command"></code><button id="copy" class="btn secondary">COPY COMMAND</button></section>
+<div id="status" aria-live="polite"></div>
+<p class="tiny">The one-time check expires after 15 minutes. Your X password is never sent to this website.</p>
+</main>
+<script src="/cservice.js?v=20261006a"></script>
+</body>
+</html>
