@@ -20,9 +20,16 @@ async function file(path,ref){
  const d=await gh(`/contents/${path}?ref=${encodeURIComponent(ref)}`);return {path,sha:d.sha,content:Buffer.from(d.content||"","base64").toString("utf8")};
 }
 async function codex(task,files){
- const prompt=`You are CodeSavant, a careful coding specialist for a small vanilla JavaScript Vercel application. Implement the operator request using the supplied repository files. Return JSON only with keys summary and files. files is an array of complete replacement files, each having path and content. Change the minimum number of files. Never output secrets, credentials, workflow files, binary files, or deletions. Preserve existing behavior, mobile layout, admin authentication, rigorous backup/preview/approval flow, and fail-closed safety. Every JavaScript file must parse.\n\nOPERATOR REQUEST:\n${task}\n\nFILES:\n${files.map(f=>`--- ${f.path} ---\n${f.content}`).join("\n")}`;
+ const basePrompt=`You are CodeSavant, a careful coding specialist for a small vanilla JavaScript Vercel application. Implement the operator request using the supplied repository files. Change the minimum number of files. Never output secrets, credentials, workflow files, binary files, or deletions. Preserve existing behavior, mobile layout, admin authentication, rigorous backup/preview/approval flow, and fail-closed safety. Every JavaScript file must parse.
 
- function parseResult(text,provider){
+OPERATOR REQUEST:
+${task}
+
+FILES:
+${files.map(f=>`--- ${f.path} ---
+${f.content}`).join("\n")}`;
+
+ function parseFullFiles(text,provider){
   let cleaned=String(text||"").trim();
   cleaned=cleaned.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");
   if(!cleaned)throw Error(`${provider} coding model returned no patch`);
@@ -33,8 +40,46 @@ async function codex(task,files){
   return out;
  }
 
+ function oneEdgeNewline(s){
+  s=String(s??"");
+  if(s.startsWith("\r\n"))s=s.slice(2); else if(s.startsWith("\n"))s=s.slice(1);
+  if(s.endsWith("\r\n"))s=s.slice(0,-2); else if(s.endsWith("\n"))s=s.slice(0,-1);
+  return s;
+ }
+
+ function parseGeminiEdits(text){
+  const raw=String(text||"");
+  const summaryMatch=raw.match(/<<<SUMMARY>>>\s*([\s\S]*?)(?=\n<<<EDIT |\n<<<END_SUMMARY>>>|$)/);
+  const summary=String(summaryMatch?.[1]||"Gemini prepared compact search/replace edits.").trim().slice(0,1500);
+  const re=/<<<EDIT path="([^"]+)">>>([\s\S]*?)<<<SEARCH>>>([\s\S]*?)<<<REPLACE>>>([\s\S]*?)<<<END_EDIT>>>/g;
+  const edits=[];
+  let m;
+  while((m=re.exec(raw))){
+   edits.push({path:String(m[1]||"").trim(),search:oneEdgeNewline(m[3]),replace:oneEdgeNewline(m[4])});
+  }
+  if(!edits.length)throw Error("Gemini coding model returned no parseable edit blocks");
+
+  const state=new Map(files.map(f=>[f.path,f.content]));
+  const touched=new Set();
+  for(const edit of edits){
+   if(!state.has(edit.path))throw Error(`Gemini tried to edit an unavailable file: ${edit.path}`);
+   if(!edit.search)throw Error(`Gemini returned an empty SEARCH block for ${edit.path}`);
+   const current=state.get(edit.path);
+   let count=0,pos=0;
+   while((pos=current.indexOf(edit.search,pos))!==-1){count++;pos+=Math.max(1,edit.search.length)}
+   if(count!==1)throw Error(`Gemini SEARCH block for ${edit.path} matched ${count} times; refusing ambiguous edit`);
+   state.set(edit.path,current.replace(edit.search,edit.replace));
+   touched.add(edit.path);
+  }
+  return {summary,files:[...touched].map(path=>({path,content:state.get(path)}))};
+ }
+
  async function openai(){
   if(!process.env.OPENAI_API_KEY)throw Error("OPENAI_API_KEY is not configured");
+  const prompt=`${basePrompt}
+
+OUTPUT FORMAT:
+Return JSON only with keys summary and files. files is an array of complete replacement files, each having path and content.`;
   const r=await fetch("https://api.openai.com/v1/chat/completions",{
    method:"POST",
    headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,"Content-Type":"application/json"},
@@ -49,13 +94,30 @@ async function codex(task,files){
   const raw=await r.text();
   let d={};try{d=JSON.parse(raw)}catch{}
   if(!r.ok)throw Error(`OpenAI coding model ${r.status}: ${d?.error?.message||raw.slice(0,180)}`);
-  return parseResult(d?.choices?.[0]?.message?.content,"OpenAI");
+  return parseFullFiles(d?.choices?.[0]?.message?.content,"OpenAI");
  }
 
- async function gemini(){
+ async function geminiCall(extra=""){
   const key=process.env.GEMINI_API_KEY;
   if(!key)throw Error("GEMINI_API_KEY is not configured");
   const model=process.env.GEMINI_CODER_MODEL||process.env.GEMINI_FREE_MODEL||process.env.GEMINI_MODEL||"gemini-3.5-flash-lite";
+  const prompt=`${basePrompt}
+
+OUTPUT FORMAT FOR GEMINI:
+Return ONLY compact SEARCH/REPLACE edit blocks, never whole files and never Markdown fences.
+
+Use exactly this structure:
+
+<<<SUMMARY>>>
+one short summary
+<<<EDIT path="existing-file.js">>>
+<<<SEARCH>>>
+exact unique text copied from the supplied file
+<<<REPLACE>>>
+replacement text
+<<<END_EDIT>>>
+
+Repeat EDIT blocks as needed. Every SEARCH must match exactly once in its file. Keep SEARCH blocks just large enough to be unique. Do not escape code as JSON. Do not create new files.${extra}`;
   const r=await fetch(
    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
    {
@@ -63,7 +125,7 @@ async function codex(task,files){
     headers:{"Content-Type":"application/json","x-goog-api-key":key},
     body:JSON.stringify({
      contents:[{role:"user",parts:[{text:prompt}]}],
-     generationConfig:{responseMimeType:"application/json",maxOutputTokens:32768}
+     generationConfig:{maxOutputTokens:32768,temperature:0.15}
     })
    }
   );
@@ -71,7 +133,20 @@ async function codex(task,files){
   let d={};try{d=JSON.parse(raw)}catch{}
   if(!r.ok)throw Error(`Gemini coding model ${r.status}: ${d?.error?.message||raw.slice(0,180)}`);
   const text=(d?.candidates?.[0]?.content?.parts||[]).map(x=>x?.text||"").join("");
-  return parseResult(text,`Gemini ${model}`);
+  return {text,model,finish:d?.candidates?.[0]?.finishReason||""};
+ }
+
+ async function gemini(){
+  let first=await geminiCall();
+  try{return parseGeminiEdits(first.text)}
+  catch(firstError){
+   console.warn("Gemini compact edit parse failed; retrying once:",firstError?.message||firstError,"finish:",first.finish,"chars:",first.text.length);
+   const second=await geminiCall("\n\nIMPORTANT: A previous response could not be parsed. Obey the markers exactly and keep every edit compact.");
+   try{return parseGeminiEdits(second.text)}
+   catch(secondError){
+    throw Error(`Gemini compact edit parsing failed twice: ${secondError?.message||secondError}; finish=${second.finish||"unknown"}; chars=${second.text.length}`);
+   }
+  }
  }
 
  let openaiError=null;
