@@ -6,9 +6,9 @@ Build an optional, premium, futuristic Brain Trust interface/skin that feels lik
 
 The interface must preserve the existing Brain Trust application, providers, chat, IRC relay, project tools, and current skins. Cosmos Command Deck is an additional skin/experience, not a destructive redesign.
 
-======================================================================
+----------------------------------------------------------------------
 1. CORE VISUAL CONCEPT
-======================================================================
+----------------------------------------------------------------------
 
 The user enters Brain Trust and sees a full-screen immersive environment:
 
@@ -29,9 +29,9 @@ The experience should feel like:
 - a real-time command center,
 - and a playful 3D navigation system.
 
-======================================================================
+----------------------------------------------------------------------
 2. CENTRAL FLOATING CUBE
-======================================================================
+----------------------------------------------------------------------
 
 The centerpiece is a floating 3D cube used for navigation.
 
@@ -70,9 +70,9 @@ Each face should have:
 - optional live status indicator,
 - subtle surface scan/reflection.
 
-======================================================================
+----------------------------------------------------------------------
 3. CUBE SELECTION / MATERIALIZATION
-======================================================================
+----------------------------------------------------------------------
 
 When a face is selected:
 
@@ -100,9 +100,9 @@ When the panel closes:
 - cube retreats into space,
 - free-floating physics resume.
 
-======================================================================
+----------------------------------------------------------------------
 4. COSMOS BACKGROUND
-======================================================================
+----------------------------------------------------------------------
 
 The cosmos is not a static wallpaper.
 
@@ -136,9 +136,9 @@ Layer E: occasional phenomena
 
 The background should feel alive without becoming visually noisy.
 
-======================================================================
+----------------------------------------------------------------------
 5. FUTURISTIC STARSHIP / OBSERVATORY SKIN
-======================================================================
+----------------------------------------------------------------------
 
 The cosmos should be integrated into a luxury futuristic environment.
 
@@ -160,9 +160,9 @@ Avoid:
 - neon overload
 - unreadable tiny text everywhere
 
-======================================================================
+----------------------------------------------------------------------
 6. ORIGINAL LIVING ATRIUM / TREE FEATURE
-======================================================================
+----------------------------------------------------------------------
 
 Include an original indoor living-atrium visual element.
 
@@ -182,9 +182,9 @@ The atrium can live:
 - inside a dedicated side panel,
 - or as a visible architectural section of the ship interior.
 
-======================================================================
+----------------------------------------------------------------------
 7. LIVE CHAT MUST REMAIN VISIBLE
-======================================================================
+----------------------------------------------------------------------
 
 The Brain Trust chat must remain visible while the cube and cosmos animate.
 
@@ -213,9 +213,9 @@ cube physics / particles / cosmos / panel animation
 
 The two systems must operate independently.
 
-======================================================================
+----------------------------------------------------------------------
 8. REAL-TIME CUBE FACE ACTIVITY
-======================================================================
+----------------------------------------------------------------------
 
 Cube faces may display concise real-time state.
 
@@ -237,9 +237,9 @@ A new message may cause:
 
 The cube must not need to stop rotating for these indicators to update.
 
-======================================================================
+----------------------------------------------------------------------
 9. HUD DATA AROUND THE CUBE
-======================================================================
+----------------------------------------------------------------------
 
 Surround the cube with elegant, sparse, readable HUD panels.
 
@@ -284,9 +284,9 @@ Potential real values:
 
 Optional decorative values may be used, but they must never be presented deceptively as real if they are simulated.
 
-======================================================================
+----------------------------------------------------------------------
 10. LIVE DATE / TIME / MOON DATA
-======================================================================
+----------------------------------------------------------------------
 
 Use real values in the integrated app where practical.
 
@@ -303,9 +303,9 @@ Moon:
 
 The data should feel like part of the command-deck instrumentation.
 
-======================================================================
+----------------------------------------------------------------------
 11. CHAT PANEL DESIGN
-======================================================================
+----------------------------------------------------------------------
 
 Suggested style:
 - translucent dark glass
@@ -325,9 +325,9 @@ On mobile:
 - safe-area aware
 - adjustable/collapsible later if desired
 
-======================================================================
+----------------------------------------------------------------------
 12. MOBILE-FIRST INTERACTION
-======================================================================
+----------------------------------------------------------------------
 
 Primary target: iPhone.
 
@@ -344,9 +344,9 @@ Requirements:
 - portrait-first design
 - landscape support where practical
 
-======================================================================
+----------------------------------------------------------------------
 13. PERFORMANCE STRATEGY
-======================================================================
+----------------------------------------------------------------------
 
 The interface should look advanced without overheating the phone.
 
@@ -375,9 +375,9 @@ Performance controls:
 - pause/reduce animation when tab is hidden
 - preserve battery
 
-======================================================================
+----------------------------------------------------------------------
 14. ACCESSIBILITY / FALLBACKS
-======================================================================
+----------------------------------------------------------------------
 
 Support:
 - prefers-reduced-motion
@@ -389,9 +389,9 @@ Support:
 
 The skin should never block access to core Brain Trust functionality.
 
-======================================================================
+----------------------------------------------------------------------
 15. EXISTING APP MUST BE PRESERVED
-======================================================================
+----------------------------------------------------------------------
 
 Cosmos Command Deck must be optional.
 
@@ -417,9 +417,9 @@ Do not break:
 - existing commands
 - existing layouts
 
-======================================================================
+----------------------------------------------------------------------
 16. REPOSITORY SAFETY
-======================================================================
+----------------------------------------------------------------------
 
 Before editing:
 1. inspect the actual repository tree
@@ -440,9 +440,9 @@ Suggested implementation approach:
 - hook into existing skin selector
 - connect to existing chat/provider state rather than duplicating app logic
 
-======================================================================
+----------------------------------------------------------------------
 17. REAL-TIME EVENT ARCHITECTURE
-======================================================================
+----------------------------------------------------------------------
 
 The skin must consume existing app events instead of inventing a parallel chat system.
 
@@ -459,9 +459,9 @@ Existing application state/event layer
 
 Graphics must never become the source of truth.
 
-======================================================================
+----------------------------------------------------------------------
 18. OPTIONAL LIVE EFFECTS
-======================================================================
+----------------------------------------------------------------------
 
 Incoming message:
 - Arena face pulse
@@ -481,9 +481,9 @@ New project activity:
 Voice mode:
 - Arena face audio pulse/ring
 
-======================================================================
+----------------------------------------------------------------------
 19. VISUAL QUALITY TARGET
-======================================================================
+----------------------------------------------------------------------
 
 The result should feel:
 - polished
@@ -503,9 +503,9 @@ It should NOT feel like:
 - a generic gamer HUD
 - a copied movie interface
 
-======================================================================
+----------------------------------------------------------------------
 20. ACCEPTANCE CRITERIA
-======================================================================
+----------------------------------------------------------------------
 
 The prototype/integration is successful when:
 
@@ -531,9 +531,9 @@ The prototype/integration is successful when:
 ✓ existing skins remain intact
 ✓ existing Brain Trust behavior is preserved
 
-======================================================================
+----------------------------------------------------------------------
 21. PRIORITY ORDER
-======================================================================
+----------------------------------------------------------------------
 
 If tradeoffs are necessary, preserve in this order:
 
@@ -547,9 +547,9 @@ If tradeoffs are necessary, preserve in this order:
 8. Atrium/tree
 9. Extra visual effects
 
-======================================================================
+----------------------------------------------------------------------
 22. FINAL DESIGN INTENT
-======================================================================
+----------------------------------------------------------------------
 
 The user should feel like Brain Trust exists inside a living cosmic command environment.
 
