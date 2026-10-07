@@ -173,7 +173,7 @@ async function brainGenerateImage(raw){
  arenaBusy=true;
 
  try{
-  const res=await fetch("/api/image",{
+  const res=await fetch("/api/gate?target=image",{
    method:"POST",
    headers:{"Content-Type":"application/json"},
    body:JSON.stringify({prompt,size:"1024x1024",quality:"low"})
@@ -210,12 +210,64 @@ async function brainGenerateImage(raw){
  }
 }
 
+async function brainRunRelayTool(raw){
+ const m=String(raw||"").match(/^[!/](catfish|hunt|ascii)(?:\s+(.*))?$/i);
+ if(!m)return false;
+ const name=m[1].toLowerCase();
+ const rest=String(m[2]||"").trim();
+ if(!rest){
+  notice("Usage: !"+name+" <arguments>","error");
+  return true;
+ }
+
+ input.value="";
+ add("message",S.nick,raw);
+
+ const typing=document.createElement("div");
+ typing.className="typing";
+ typing.textContent=name.toUpperCase()+" is running on the trusted relay…";
+ chat.appendChild(typing);
+ chat.scrollTop=chat.scrollHeight;
+
+ const button=$("#send");
+ button.disabled=true;
+ arenaBusy=true;
+
+ try{
+  const args=[];
+  rest.replace(/"([^"]*)"|'([^']*)'|(\S+)/g,(_,a,b,c)=>{
+   args.push(a??b??c??"");
+   return "";
+  });
+  const res=await fetch("/api/gate?target=relay-tool",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({name,args:args.slice(0,12)})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.error||("HTTP "+res.status));
+  const output=data.output??data.text??data.result??data.stdout??data.raw??JSON.stringify(data);
+  typing.remove();
+  add("message","PrincessGPT","🧰 "+name.toUpperCase()+"\n"+String(output||"(no output)").slice(0,6000));
+ }catch(e){
+  typing.remove();
+  notice("⚠ "+name.toUpperCase()+": "+(e.message||e),"error");
+ }finally{
+  button.disabled=false;
+  arenaBusy=false;
+  input.focus();
+  if(liveWanted)setTimeout(startLiveListening,500);
+ }
+ return true;
+}
+
 send=async function(spokenText=""){
  if(spokenText&&typeof spokenText==="object")spokenText="";
  const raw=String(spokenText||input.value).trim();
  if(!raw&&!pendingImages.length)return;
 
  if(/^[!/](?:image|imagine)(?:\\s|$)/i.test(raw))return brainGenerateImage(raw);
+ if(/^[!/](?:catfish|hunt|ascii)(?:\s|$)/i.test(raw))return brainRunRelayTool(raw);
 
  if(/^\/models?(?:\s|$)/i.test(raw)){
   const wanted=raw.replace(/^\/models?\s*/i,"").trim().toLowerCase();

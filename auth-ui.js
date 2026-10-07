@@ -1,5 +1,5 @@
 (()=>{
-  const APP_SCRIPTS=["/app.js","/mobile-hotfix.js","/braintrust-v2.js","/adaptive-display.js","/voice-unlock.js","/gemini-free-max.js","/free-life-ui.js","/control-plane.js"];
+  const APP_SCRIPTS=["/app.js","/braintrust-v2.js","/mobile-hotfix.js","/adaptive-display.js","/voice-unlock.js","/gemini-free-max.js","/free-life-ui.js","/control-plane.js"];
   function el(tag,attrs={},text=""){const node=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")node.className=v;else node.setAttribute(k,v)}if(text)node.textContent=text;return node}
   function installStyle(){if(document.getElementById("bt-auth-style"))return;const style=el("style",{id:"bt-auth-style"});style.textContent=`
 body.bt-auth-pending .app,body.bt-auth-pending #layoutDock,body.bt-auth-pending #layoutPanel{visibility:hidden}
@@ -13,7 +13,7 @@ body.bt-auth-pending .app,body.bt-auth-pending #layoutDock,body.bt-auth-pending 
 #btSessionBadge{display:inline-flex;align-items:center;margin-left:5px;padding:1px 5px;border:1px solid #3b5872;border-radius:8px;font:700 7px Menlo,monospace;color:#9bc9ee}
 #btLogout{margin-left:4px;background:transparent;border:1px solid #3b5872;color:#9fb3c3;border-radius:6px;padding:2px 5px;font:700 7px Menlo,monospace}
 body.bt-role-member .fundMini{display:none!important}`;document.head.appendChild(style)}
-  function loadScript(src){return new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=src+(src.includes("?")?"s.src=src;":"?")+"v=20261005a";s.onload=resolve;s.onerror=()=>reject(new Error(`Could not load ${src}`));document.body.appendChild(s)})}
+  function loadScript(src){return new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=src+(src.includes("?")?"s.src=src;":"?")+"v=20261007-commandfix4";s.onload=resolve;s.onerror=()=>reject(new Error(`Could not load ${src}`));document.body.appendChild(s)})}
   function seedNick(user){try{const raw=localStorage.getItem("AITirc");if(!raw)return;const state=JSON.parse(raw);if(!state||typeof state!=="object")return;state.nick=user.nick;state.ops={};if(["owner","maintainer"].includes(user.role))state.ops[user.nick]=1;localStorage.setItem("AITirc",JSON.stringify(state))}catch{}}
   async function loadApp(user){window.BRAINTRUST_USER=user;seedNick(user);for(const src of APP_SCRIPTS)await loadScript(src);if(typeof S!=="undefined"){S.nick=user.nick;S.ops={};if(["owner","maintainer"].includes(user.role))S.ops[user.nick]=1;if(typeof save==="function")save();if(typeof render==="function")render()}document.body.classList.add(`bt-role-${user.role}`);const badge=document.querySelector("#deviceBadge");if(badge){const role=el("span",{id:"btSessionBadge"},user.role.toUpperCase());badge.insertAdjacentElement("afterend",role);const out=el("button",{id:"btLogout",type:"button"},"LOGOUT");out.onclick=async()=>{try{await fetch("/api/logout",{method:"POST"})}catch{}location.reload()};role.insertAdjacentElement("afterend",out)}document.body.classList.remove("bt-auth-pending");document.body.classList.add("bt-auth-ready")}
   function showLogin(message=""){
