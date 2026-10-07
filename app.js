@@ -134,14 +134,14 @@ function compactError(nick,message){
 try{sessionStorage.removeItem("arenaAdminKey")}catch{}
 async function pilot(action,payload={}){const r=await fetch("/api/gate?target=autopilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||`Auto-Pilot HTTP ${r.status}`);return d}
 function pilotCard(data){const box=document.createElement("div");box.className="pilotCard";box.innerHTML=`<b>🤖 GITHUB SPECIALIST — PREVIEW #${data.pr}</b><p>${safe(data.summary||"Implementation prepared.")}</p><small>Backup: ${safe(data.backup)}</small><div class="pilotActions"><a href="${safe(data.url)}" target="_blank" rel="noopener">OPEN PREVIEW / PR</a><button data-pilot="status">CHECK</button><button data-pilot="approve">DEPLOY</button><button data-pilot="reject">REJECT</button></div><div class="pilotState">Production is unchanged. Tests must pass before DEPLOY.</div>`;box.onclick=async e=>{const action=e.target.dataset.pilot;if(!action)return;e.target.disabled=true;const state=box.querySelector(".pilotState");state.textContent="Working…";try{const d=await pilot(action,{pr:data.pr});state.textContent=action==="status"?(d.ready?"✅ Checks passed — ready for Kyle to deploy.":`⏳ Waiting: ${(d.checks||[]).map(x=>`${x.name} ${x.status}/${x.conclusion||"pending"}`).join(" · ")||"checks have not appeared yet"}`):d.message||d.stage;if(action==="approve")state.textContent="✅ Approved and merged. Vercel is deploying production.";if(action==="reject")state.textContent="🛑 Rejected. Production was not changed."}catch(err){state.textContent=`⚠ ${err.message}`}finally{e.target.disabled=false}};chat.appendChild(box);chat.scrollTop=chat.scrollHeight}
-async function startBuild(task){notice("🛟 Auto-Pilot: creating and verifying the rigorous backup before any code is changed…");try{const d=await pilot("propose",{task});S.autopilot.lastPr=d.pr;S.autopilot.lastBackup=d.backup;S.autopilot.lastUrl=d.url;save();notice(`*** CodeSavant prepared preview PR #${d.pr}. Production is unchanged.`);pilotCard(d)}catch(e){notice(`🛑 Auto-Pilot stopped safely — ${e.message}`,"error")}}
+async function startBuild(task){notice("🛟 Auto-Pilot: creating and verifying the rigorous backup before any code is changed…");try{const d=await pilot("propose",{task});S.autopilot.lastPr=d.pr;S.autopilot.lastBackup=d.backup;S.autopilot.lastUrl=d.url;save();notice(`*** CodeSavant prepared preview PR #${d.pr}. Production is unchanged.`);pilotCard(d);window.BrainTrustBuildConsole?.follow(d).catch(e=>notice(`Build console: ${e.message}`,"error"))}catch(e){notice(`🛑 Auto-Pilot stopped safely — ${e.message}`,"error")}}
 function help(){
  ["Commands: /me /topic /nick /whois /names",
   "/op /deop /voice /devoice /kick /ban /unban /invite",
   "/mode +m|-m · /mode +i|-i · /clear · /reset"
  ].forEach(x=>notice(x));
 }
-function command(raw){
+async function command(raw){
  let p=raw.slice(1).trim().split(/\s+/),c=(p.shift()||"").toLowerCase(),r=p.join(" "),n=name(p[0]);
  if(c==="me"){if(r)add("action",S.nick,r);return}
  if(c==="help"){help();return}
@@ -168,6 +168,17 @@ function command(raw){
   if(!n||n===S.nick)return notice("No such AI contestant","error");
   if(S.banned[n])return notice(`${n} is banned. Use /unban ${n} first.`,"error");
   S.present[n]=1;save();render();return notice(`${n} joined #ai-tournament`);
+ }
+ if(c==="msg"||c==="query"){
+  const target=String(p.shift()||"").trim(),text=p.join(" ").trim();if(!target||!text)return notice("Usage: /msg Nick message","error");
+  try{await window.BrainTrustIRC.pm(target,text);notice(`→ ${target}: ${text}`)}catch(e){notice(`IRC PM failed — ${e.message}`,"error")}return
+ }
+ if(c==="ircstatus"){
+  try{const d=await window.BrainTrustIRC.status();notice(`IRC relay: ${d.connected?"CONNECTED":"OFFLINE"} · ${d.nick||""} ${d.channel||""}`)}catch(e){notice(`IRC status failed — ${e.message}`,"error")}return
+ }
+ if(c==="dcc"){
+  const target=String(p.shift()||"").trim(),filePath=p.join(" ").trim();if(!target||!filePath)return notice("Usage: /dcc Nick /server/path/file","error");
+  try{const d=await window.BrainTrustIRC.dcc(target,filePath);notice(`DCC SEND offered to ${target}: ${d.file||filePath}`)}catch(e){notice(`DCC failed — ${e.message}`,"error")}return
  }
  if(c==="mode"){
   let m=p[0];
@@ -260,6 +271,12 @@ async function send(spokenText=""){
   if(raw==="!reject"&&S.autopilot.lastPr){try{const d=await pilot("reject",{pr:S.autopilot.lastPr});notice(`🛑 ${d.message}`)}catch(e){notice(e.message,"error")}return}
   if(raw==="!rollback"&&S.autopilot.lastBackup){if(!confirm(`ROLL BACK production to ${S.autopilot.lastBackup}?`))return;try{const d=await pilot("rollback",{backup:S.autopilot.lastBackup});notice(`♻️ ${d.message}`)}catch(e){notice(`Rollback blocked — ${e.message}`,"error")}return}
   if(raw.startsWith("!call ")){const [,kind,...words]=raw.split(/\s+/),sp=S.specialists[kind];if(!sp)return notice("Unknown specialist. Type !specialists","error");if(kind==="coding")return startBuild(words.join(" "));if(!sp.enabled)return notice(`${sp.nick} unavailable — ${sp.status}. No credits used.`,"error");notice(`*** ${sp.nick} joined #${S.workspace.channel} (specialist: ${kind})`);const result=await ask(sp.provider,sp.nick,`You are the summoned ${kind} specialist. Work only on this task and report a concrete result: ${words.join(" ")}`,[]);notice(`*** ${sp.nick} left #${S.workspace.channel} (${result?"assignment complete":"no supported connection"})`);return}
+  if(/^!(catfish|hunt|ascii)(?:\s|$)/i.test(raw)){
+    const [,tool,...args]=raw.split(/\s+/);add("message",S.nick,raw);
+    try{const d=await window.BrainTrustIRC.tool(tool.slice(1).toLowerCase(),args);notice(String(d.output||d.result||d.raw||"Tool completed."))}catch(e){notice(`${tool} failed — ${e.message}`,"error")}return
+  }
+  if(raw==="!camera"){try{const f=await window.BrainTrustMedia.camera();if(f?.dataUrl){pendingImages.push(f.dataUrl);renderPhotoTray();notice("Camera image ready for the next AI turn.")}}catch(e){notice(`Camera failed — ${e.message}`,"error")}return}
+  if(raw==="!upload"){try{const f=await window.BrainTrustMedia.upload();if(!f)return;if(f.kind==="image"){pendingImages.push(f.dataUrl);renderPhotoTray();notice(`${f.name} ready for the next AI turn.`);return}if(f.kind==="text"){return send(`Attached file: ${f.name}\n\n${f.text}`)}}catch(e){notice(`Upload failed — ${e.message}`,"error")}return}
   if(raw.startsWith("!log")||raw.startsWith("!export")){const kind=raw.includes("json")?"json":"txt",rows=S.workspace.logs[S.workspace.channel]||[],body=kind==="json"?JSON.stringify(rows,null,2):rows.map(x=>`[${x.at}] <${x.nick}> ${x.text}`).join("\n"),blob=new Blob([body],{type:kind==="json"?"application/json":"text/plain"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${S.workspace.channel}-log.${kind}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice(`Log download prepared: ${a.download}`);return}
   if(raw.startsWith("/"))return command(raw);
   const images=pendingImages.slice(),requestText=raw||`Please examine these ${images.length} picture${images.length==1?"":"s"}.`;
