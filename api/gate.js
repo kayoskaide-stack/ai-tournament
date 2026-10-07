@@ -9,8 +9,9 @@ import transcribe from "./transcribe.js";
 import status from "./status.js";
 import funds from "./funds.js";
 import autopilot from "./autopilot.js";
+import imageGeneration from "../lib/braintrust-image.js";
 
-const handlers = { contestant, "free-life": freeLife, speak, transcribe, status, funds };
+const handlers = { contestant, "free-life": freeLife, speak, transcribe, status, funds, image: imageGeneration };
 const architectureCaps = { propose:"propose", status:"preview", approve:"approve", reject:"reject", rollback:"rollback" };
 
 function relayEndpoint(kind) {
@@ -58,7 +59,7 @@ export default async function handler(req,res){
   if(target==="capabilities"){
     const user=requireAccess(req,res,"chat");if(!user)return;
     if(req.method!=="GET")return res.status(405).json({error:"GET only"});
-    return res.status(200).json({ok:true,tools:BRAINTRUST_TOOLS,features:{passwordless:true,cserviceUsernameOnly:true,ircPrivateMessages:true,ircStatus:true,buildConsole:true,uploads:true,camera:true,dcc:true}});
+    return res.status(200).json({ok:true,tools:BRAINTRUST_TOOLS,features:{passwordless:true,cserviceUsernameOnly:true,ircPrivateMessages:true,ircStatus:true,buildConsole:true,uploads:true,camera:true,dcc:true,imageGeneration:true}});
   }
 
   if(target==="irc-status"){

@@ -152,10 +152,70 @@ ask=brainAsk;
 
 const legacySend=send;
 
+async function brainGenerateImage(raw){
+ const prompt=String(raw||"").replace(/^[/!](?:image|imagine)\\s*/i,"").trim();
+ if(!prompt){
+  notice("Usage: !image describe the picture you want","error");
+  return;
+ }
+
+ input.value="";
+ add("message",S.nick,raw);
+
+ const typing=document.createElement("div");
+ typing.className="typing";
+ typing.textContent="PrincessGPT is painting…";
+ chat.appendChild(typing);
+ chat.scrollTop=chat.scrollHeight;
+
+ const button=$("#send");
+ button.disabled=true;
+ arenaBusy=true;
+
+ try{
+  const res=await fetch("/api/image",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({prompt,size:"1024x1024",quality:"low"})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
+  if(!data.image)throw Error("Image generator returned no image");
+
+  typing.remove();
+
+  add(
+   "message",
+   "PrincessGPT",
+   `🎨 ${data.model||"image"} · ${data.size||"1024x1024"} · ${String(data.quality||"low").toUpperCase()}`
+  );
+
+  const box=document.createElement("div");
+  box.className="attachment";
+  const img=document.createElement("img");
+  img.src=data.image;
+  img.alt=`Generated image: ${prompt.slice(0,160)}`;
+  img.loading="lazy";
+  box.appendChild(img);
+  chat.appendChild(box);
+  chat.scrollTop=chat.scrollHeight;
+ }catch(e){
+  typing.remove();
+  notice(`⚠ Image generation: ${e.message}`,"error");
+ }finally{
+  button.disabled=false;
+  arenaBusy=false;
+  input.focus();
+  if(liveWanted)setTimeout(startLiveListening,500);
+ }
+}
+
 send=async function(spokenText=""){
  if(spokenText&&typeof spokenText==="object")spokenText="";
  const raw=String(spokenText||input.value).trim();
  if(!raw&&!pendingImages.length)return;
+
+ if(/^[!/](?:image|imagine)(?:\\s|$)/i.test(raw))return brainGenerateImage(raw);
 
  if(/^\/models?(?:\s|$)/i.test(raw)){
   const wanted=raw.replace(/^\/models?\s*/i,"").trim().toLowerCase();

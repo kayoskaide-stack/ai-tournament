@@ -2,17 +2,57 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/api/login", "destination": "/api/auth?action=login" },
-    { "source": "/api/session", "destination": "/api/auth?action=session" },
-    { "source": "/api/logout", "destination": "/api/auth?action=logout" },
-    { "source": "/api/users", "destination": "/api/admin?scope=users" },
-    { "source": "/api/security", "destination": "/api/admin?scope=security" },
-    { "source": "/api/contestant", "destination": "/api/gate?target=contestant" },
-    { "source": "/api/free-life", "destination": "/api/gate?target=free-life" },
-    { "source": "/api/speak", "destination": "/api/gate?target=speak" },
-    { "source": "/api/transcribe", "destination": "/api/gate?target=transcribe" },
-    { "source": "/api/status", "destination": "/api/gate?target=status" },
-    { "source": "/api/funds", "destination": "/api/gate?target=funds" },
-    { "source": "/api/autopilot", "destination": "/api/gate?target=autopilot" }
+    {
+      "source": "/api/login",
+      "destination": "/api/auth?action=login"
+    },
+    {
+      "source": "/api/session",
+      "destination": "/api/auth?action=session"
+    },
+    {
+      "source": "/api/logout",
+      "destination": "/api/auth?action=logout"
+    },
+    {
+      "source": "/api/users",
+      "destination": "/api/admin?scope=users"
+    },
+    {
+      "source": "/api/security",
+      "destination": "/api/admin?scope=security"
+    },
+    {
+      "source": "/api/contestant",
+      "destination": "/api/gate?target=contestant"
+    },
+    {
+      "source": "/api/free-life",
+      "destination": "/api/gate?target=free-life"
+    },
+    {
+      "source": "/api/speak",
+      "destination": "/api/gate?target=speak"
+    },
+    {
+      "source": "/api/transcribe",
+      "destination": "/api/gate?target=transcribe"
+    },
+    {
+      "source": "/api/status",
+      "destination": "/api/gate?target=status"
+    },
+    {
+      "source": "/api/funds",
+      "destination": "/api/gate?target=funds"
+    },
+    {
+      "source": "/api/image",
+      "destination": "/api/gate?target=image"
+    },
+    {
+      "source": "/api/autopilot",
+      "destination": "/api/gate?target=autopilot"
+    }
   ]
 }
