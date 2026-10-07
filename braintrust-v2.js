@@ -153,7 +153,7 @@ ask=brainAsk;
 const legacySend=send;
 
 async function brainGenerateImage(raw){
- const prompt=String(raw||"").replace(/^[/!](?:image|imagine)\\s*/i,"").trim();
+ const prompt=String(raw||"").replace(/^[/!](?:image|imagine)\s*/i,"").trim();
  if(!prompt){
   notice("Usage: !image describe the picture you want","error");
   return;
@@ -266,7 +266,7 @@ send=async function(spokenText=""){
  const raw=String(spokenText||input.value).trim();
  if(!raw&&!pendingImages.length)return;
 
- if(/^[!/](?:image|imagine)(?:\\s|$)/i.test(raw))return brainGenerateImage(raw);
+ if(/^[!/](?:image|imagine)(?:\s|$)/i.test(raw))return brainGenerateImage(raw);
  if(/^[!/](?:catfish|hunt|ascii)(?:\s|$)/i.test(raw))return brainRunRelayTool(raw);
 
  if(/^\/models?(?:\s|$)/i.test(raw)){
