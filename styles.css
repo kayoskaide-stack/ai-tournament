@@ -279,3 +279,10 @@ body.adaptiveDisplay #users .modelMini{
  font-size:max(5px,calc(var(--ad-small) - 2px))!important;
  line-height:7px!important;
 }
+
+/* BRAINTRUST_MASTER_BUILD_CONSOLE_V1 */
+#btBuildConsole{position:fixed;right:10px;bottom:10px;z-index:99999;width:min(720px,calc(100vw - 20px));height:min(55vh,520px);background:#071019;border:1px solid #456;color:#d8e7ef;box-shadow:0 12px 40px #000b;font:12px/1.45 Menlo,Monaco,Consolas,monospace}
+.btBuildHead{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0c1822;border-bottom:1px solid #345}
+.btBuildHead button{background:transparent;color:#d8e7ef;border:0;font-size:20px}
+#btBuildBar{height:5px;background:#162631}#btBuildBar i{display:block;height:100%;width:0;background:currentColor;transition:width .25s}
+#btBuildLog{height:calc(100% - 48px);overflow:auto;margin:0;padding:10px;white-space:pre-wrap}
