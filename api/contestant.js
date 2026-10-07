@@ -1,3 +1,4 @@
+import { toolAwarenessPrompt } from "./lib/braintrust-tools.js";
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   gemini: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
@@ -807,3 +808,5 @@ Kyle's message: ${effectiveChallenge}`;
     });
   }
 }
+
+export const BRAINTRUST_TOOL_AWARENESS = toolAwarenessPrompt();
