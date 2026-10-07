@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "features": {
+    "passwordless_resend_onboarding": true,
+    "cservice_username_onboarding": true,
+    "private_messages": true,
+    "irc_status": true,
+    "live_private_build_console": true,
+    "build_progress_bars": true,
+    "irc_client_features": true,
+    "catfish": true,
+    "hunt": true,
+    "ascii_tools": true,
+    "uploads": true,
+    "camera": true,
+    "dcc_send": true,
+    "ai_tool_awareness": true
+  },
+  "security": {
+    "never_collect_cservice_password": true,
+    "owner_approval_required_for_production": true,
+    "backup_before_changes": true,
+    "stage_commits": true
+  }
+}
