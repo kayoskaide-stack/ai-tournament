@@ -1,5 +1,6 @@
 import net from "node:net";
 import http from "node:http";
+import https from "node:https";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -29,6 +30,10 @@ const cfg = {
   logFile: env.LOG_FILE || "logs/irc-relay.jsonl",
   bridgeHost: env.BRAINTRUST_BRIDGE_HOST || "127.0.0.1",
   bridgePort: Number(env.BRAINTRUST_BRIDGE_PORT || 8788),
+  httpsHost: env.BRAINTRUST_HTTPS_HOST || "0.0.0.0",
+  httpsPort: Number(env.BRAINTRUST_HTTPS_PORT || 0),
+  tlsKey: env.BRAINTRUST_TLS_KEY || "",
+  tlsCert: env.BRAINTRUST_TLS_CERT || "",
   bridgeToken: env.BRAINTRUST_RELAY_TOKEN || env.ARENA_RELAY_KEY || "",
   dccPublicIpv4: env.BRAINTRUST_DCC_PUBLIC_IPV4 || "",
   dccPort: Number(env.BRAINTRUST_DCC_PORT || 0),
@@ -41,6 +46,7 @@ let shuttingDown = false;
 let lastReplyAt = 0;
 let replyBusy = false;
 let bridgeServer = null;
+let httpsBridgeServer = null;
 
 function tournamentDelayMs() {
   const who = `${cfg.persona} ${cfg.provider}`.toLowerCase();
@@ -92,24 +98,82 @@ function safeEqual(a,b){const A=Buffer.from(String(a||""),"utf8"),B=Buffer.from(
 function bridgeAuthorized(req){const h=String(req.headers?.authorization||"");return h.toLowerCase().startsWith("bearer ")&&safeEqual(h.slice(7).trim(),cfg.bridgeToken)}
 function bridgeJson(res,status,data){res.writeHead(status,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify(data))}
 function readBridgeBody(req){return new Promise((resolve,reject)=>{let raw="";req.on("data",chunk=>{raw+=chunk;if(raw.length>1024*1024){reject(Error("request too large"));req.destroy()}});req.on("end",()=>{try{resolve(raw?JSON.parse(raw):{})}catch{reject(Error("invalid JSON"))}});req.on("error",reject)})}
+async function bridgeRequest(req,res){
+  try{
+    const u=new URL(req.url||"/","https://relay.local");
+    if(!bridgeAuthorized(req))return bridgeJson(res,401,{error:"Unauthorized relay bridge."});
+    if(req.method==="GET"&&u.pathname==="/health")
+      return bridgeJson(res,200,{ok:true,connected:Boolean(socket&&!socket.destroyed),nick:cfg.nick,channel:cfg.channel,server:cfg.server});
+    if(req.method!=="POST")return bridgeJson(res,405,{error:"POST only"});
+    const body=await readBridgeBody(req);
+    if(u.pathname==="/pm"){
+      privateMessage(send,body.nick,body.text);
+      return bridgeJson(res,200,{ok:true,queued:true,nick:String(body.nick||"")});
+    }
+    if(u.pathname==="/tool"){
+      const name=String(body.name||"").toLowerCase();
+      if(!["catfish","hunt","ascii"].includes(name))
+        return bridgeJson(res,400,{error:"Unknown tool."});
+      const output=await runLegacyTool(
+        name,
+        Array.isArray(body.args)?body.args.map(String):[],
+        {cwd:process.cwd()}
+      );
+      return bridgeJson(res,200,{ok:true,name,output});
+    }
+    if(u.pathname==="/dcc"){
+      const result=await dccSend(
+        send,
+        body.nick,
+        body.filePath,
+        cfg.dccPublicIpv4,
+        cfg.dccPort,
+        {root:cfg.dccRoot}
+      );
+      return bridgeJson(res,200,result);
+    }
+    return bridgeJson(res,404,{error:"Unknown relay bridge route."});
+  }catch(e){
+    log("bridge_error",{error:e?.message||String(e)});
+    return bridgeJson(res,500,{error:e?.message||String(e)});
+  }
+}
+
 function startBridge(){
-  if(bridgeServer)return;
-  if(!cfg.bridgeToken||cfg.bridgeToken.length<16)throw Error("BRAINTRUST_RELAY_TOKEN/ARENA_RELAY_KEY must be at least 16 characters.");
-  bridgeServer=http.createServer(async(req,res)=>{
-    try{
-      const u=new URL(req.url||"/","http://relay.local");
-      if(!bridgeAuthorized(req))return bridgeJson(res,401,{error:"Unauthorized relay bridge."});
-      if(req.method==="GET"&&u.pathname==="/health")return bridgeJson(res,200,{ok:true,connected:Boolean(socket&&!socket.destroyed),nick:cfg.nick,channel:cfg.channel,server:cfg.server});
-      if(req.method!=="POST")return bridgeJson(res,405,{error:"POST only"});
-      const body=await readBridgeBody(req);
-      if(u.pathname==="/pm"){privateMessage(send,body.nick,body.text);return bridgeJson(res,200,{ok:true,queued:true,nick:String(body.nick||"")})}
-      if(u.pathname==="/tool"){const name=String(body.name||"").toLowerCase();if(!["catfish","hunt","ascii"].includes(name))return bridgeJson(res,400,{error:"Unknown tool."});const output=await runLegacyTool(name,Array.isArray(body.args)?body.args.map(String):[],{cwd:process.cwd()});return bridgeJson(res,200,{ok:true,name,output})}
-      if(u.pathname==="/dcc"){const result=await dccSend(send,body.nick,body.filePath,cfg.dccPublicIpv4,cfg.dccPort,{root:cfg.dccRoot});return bridgeJson(res,200,result)}
-      return bridgeJson(res,404,{error:"Unknown relay bridge route."});
-    }catch(e){log("bridge_error",{error:e?.message||String(e)});return bridgeJson(res,500,{error:e?.message||String(e)})}
-  });
-  bridgeServer.listen(cfg.bridgePort,cfg.bridgeHost,()=>log("bridge_listening",{host:cfg.bridgeHost,port:cfg.bridgePort}));
-  bridgeServer.on("error",e=>log("bridge_server_error",{error:e.message||String(e)}));
+  if(bridgeServer||httpsBridgeServer)return;
+  if(!cfg.bridgeToken||cfg.bridgeToken.length<16)
+    throw Error("BRAINTRUST_RELAY_TOKEN/ARENA_RELAY_KEY must be at least 16 characters.");
+
+  bridgeServer=http.createServer(bridgeRequest);
+  bridgeServer.listen(
+    cfg.bridgePort,
+    cfg.bridgeHost,
+    ()=>log("bridge_listening",{scheme:"http",host:cfg.bridgeHost,port:cfg.bridgePort})
+  );
+  bridgeServer.on(
+    "error",
+    e=>log("bridge_server_error",{error:e.message||String(e)})
+  );
+
+  if(cfg.httpsPort>0){
+    if(!cfg.tlsKey||!cfg.tlsCert)
+      throw Error("HTTPS enabled but TLS key/certificate paths are missing.");
+
+    httpsBridgeServer=https.createServer({
+      key:fs.readFileSync(cfg.tlsKey),
+      cert:fs.readFileSync(cfg.tlsCert)
+    },bridgeRequest);
+
+    httpsBridgeServer.listen(
+      cfg.httpsPort,
+      cfg.httpsHost,
+      ()=>log("https_bridge_listening",{scheme:"https",host:cfg.httpsHost,port:cfg.httpsPort})
+    );
+    httpsBridgeServer.on(
+      "error",
+      e=>log("https_bridge_error",{error:e.message||String(e)})
+    );
+  }
 }
 
 function safeIrcText(s) {
@@ -603,6 +667,7 @@ function shutdown(signal) {
   });
   clearTimeout(reconnectTimer);
   try { bridgeServer?.close(); } catch {}
+  try { httpsBridgeServer?.close(); } catch {}
   try {
     socket?.end(
       "QUIT :PrincessGPT relay shutting down\r\n"
