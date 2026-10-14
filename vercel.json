@@ -54,5 +54,7 @@
       "source": "/api/autopilot",
       "destination": "/api/gate?target=autopilot"
     }
-  ]
+  ],
+  "buildCommand": "node scripts/verify-free-power.mjs",
+  "outputDirectory": "."
 }

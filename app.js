@@ -58,7 +58,7 @@ const mircColours=["#fff","#000","#00007f","#009300","#ff0000","#7f0000","#9c009
 
 function add(type,nick,text,keep=true){
  if(type==="message"){
-  const virtual=virtualizeMessage(nick,text);nick=virtual.nick;text=virtual.text;
+  // Preserve the actual speaker; model-written name prefixes never change identity.
   const providerKey=providerKeyForNick(nick);
   if(providerKey){
    S.providerState[providerKey]=Object.assign({},S.providerState[providerKey]||{},{status:"ready",reason:""});
@@ -84,7 +84,8 @@ function add(type,nick,text,keep=true){
  }
  if(keep&&(type==="message"||type==="action")){
  S.history.push({nick,text});S.history=S.history.slice(-20);save();
-  const ch=S.workspace.channel;S.workspace.logs[ch]=S.workspace.logs[ch]||[];S.workspace.logs[ch].push({at:new Date().toISOString(),nick,text});S.workspace.logs[ch]=S.workspace.logs[ch].slice(-2000);save();
+  const ch=S.workspace.channel;S.workspace.logs[ch]=S.workspace.logs[ch]||[];const logRow={id:crypto.randomUUID(),at:new Date().toISOString(),nick,text,type};S.workspace.logs[ch].push(logRow);if(S.workspace.logs[ch].length>2000){const removed=S.workspace.logs[ch].splice(0,S.workspace.logs[ch].length-2000);S.workspace.logTruncatedBefore=S.workspace.logTruncatedBefore||{};S.workspace.logTruncatedBefore[ch]=removed[removed.length-1].at;}save();
+  window.dispatchEvent(new CustomEvent("braintrust:message",{detail:{channel:ch,row:logRow}}));
  }
 }
 function name(x){
@@ -277,6 +278,7 @@ async function send(spokenText=""){
   }
   if(raw==="!camera"){try{const f=await window.BrainTrustMedia.camera();if(f?.dataUrl){pendingImages.push(f.dataUrl);renderPhotoTray();notice("Camera image ready for the next AI turn.")}}catch(e){notice(`Camera failed — ${e.message}`,"error")}return}
   if(raw==="!upload"){try{const f=await window.BrainTrustMedia.upload();if(!f)return;if(f.kind==="image"){pendingImages.push(f.dataUrl);renderPhotoTray();notice(`${f.name} ready for the next AI turn.`);return}if(f.kind==="text"){return send(`Attached file: ${f.name}\n\n${f.text}`)}}catch(e){notice(`Upload failed — ${e.message}`,"error")}return}
+  if((raw.startsWith("!log")||raw.startsWith("!export"))&&window.BrainTrustLogs){window.BrainTrustLogs.open();return}
   if(raw.startsWith("!log")||raw.startsWith("!export")){const kind=raw.includes("json")?"json":"txt",rows=S.workspace.logs[S.workspace.channel]||[],body=kind==="json"?JSON.stringify(rows,null,2):rows.map(x=>`[${x.at}] <${x.nick}> ${x.text}`).join("\n"),blob=new Blob([body],{type:kind==="json"?"application/json":"text/plain"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${S.workspace.channel}-log.${kind}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice(`Log download prepared: ${a.download}`);return}
   if(raw.startsWith("/"))return command(raw);
   const images=pendingImages.slice(),requestText=raw||`Please examine these ${images.length} picture${images.length==1?"":"s"}.`;
@@ -376,7 +378,7 @@ function renderProviderStatus(){
 async function checkProviders(){
  try{
   const r=await fetch("/api/status",{cache:"no-store"}),d=await r.json();
-  const configured=new Set((d.configuredKeys||[]).map(x=>String(x).toLowerCase()));
+  const configured=new Set((d.callableSeats||d.configuredKeys||[]).map(x=>String(x).toLowerCase()));
   for(const a of AI_META){
    providerReady[a.key]=configured.has(a.key);
    if(!providerReady[a.key]&&S.providerState[a.key]?.status==="ready")S.providerState[a.key].reason="API not configured";

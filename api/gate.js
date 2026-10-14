@@ -2,7 +2,9 @@
 import { requireAccess, audit } from "../lib/braintrust-auth.js";
 import { BRAINTRUST_TOOLS } from "../lib/braintrust-tools.js";
 
+import freePower from "../lib/free-power.js";
 import contestant from "./contestant.js";
+import seatReply from "../lib/seat-reply.js";
 import freeLife from "./free-life.js";
 import speak from "./speak.js";
 import transcribe from "./transcribe.js";
@@ -11,7 +13,7 @@ import funds from "./funds.js";
 import autopilot from "./autopilot.js";
 import imageGeneration from "../lib/braintrust-image.js";
 
-const handlers = { contestant, "free-life": freeLife, speak, transcribe, status, funds, image: imageGeneration };
+const handlers = { "free-power": freePower, contestant, "free-life": freeLife, speak, transcribe, status, funds, image: imageGeneration };
 const architectureCaps = { propose:"propose", status:"preview", approve:"approve", reject:"reject", rollback:"rollback" };
 
 function relayEndpoint(kind) {
@@ -101,5 +103,6 @@ export default async function handler(req,res){
   const capability=target==="funds"?"view_funds":"chat";
   const user=requireAccess(req,res,capability);if(!user)return;
   req.braintrustUser=user;req.braintrustAuthorized=true;
+  if (["contestant", "free-life"].includes(target) && req.body?.allSeats === true) return seatReply(req,res);
   return protectedHandler(req,res);
 }

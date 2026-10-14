@@ -220,7 +220,7 @@
         ["deepseek","mistral","openrouter"]
         .includes(a.key)
       ){
-        if(st.status==="ready"){
+        if(st.status==="ready" && st.free){
           ensureBadge(row,"FREE","free",st.route||"FREE-LIFE");
         }
         mini.textContent=shortModel(model||(

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#010208"/>
+
+<title>Brain Trust — Cube and Cosmos</title>
+<link rel="stylesheet" href="/cosmos/style.css?v=20261014-power1"/>
+<script type="importmap">{"imports":{"three":"/cosmos/vendor/three.module.js","three/addons/":"/cosmos/vendor/"}}</script>
+</head>
+<body>
+<div class="deckGrid"></div><div class="orbitalRing"></div><div class="deckCorner topLeft"></div><div class="deckCorner bottomRight"></div><div id="flightLabel">SECTOR APPROACH</div><div class="deckTelemetry"><span>BT / COSMOS</span><b id="deckTime">--:--:--</b><span>SWIPE / ROTATE</span></div><div id="app"></div><div id="scan"></div><div id="reticle"></div><button id="wake" aria-label="show interface"></button>
+<div id="hud">
+  <div class="tag"><b>BRAIN TRUST <em>SELECT A SECTOR</em></b><br/><span id="skyTitle">JWST · NGC 346 · MIRI</span><div class="sub">OPTICAL NAVIGATION / DEEP SPACE INTERFACE</div></div>
+  <div class="mode">MODE<strong id="modeLabel">LENS</strong><span id="zoomLabel">CUBE 1.00×</span></div>
+  <div id="astroInfo"><b>OBSERVATION // NGC 7129</b>RA 21:43:05.02 · DEC +66:06:45.83<br/>CEPHEUS · ≈3,300 LY · IMAGE ≈6′ / 5.7 LY<br/>NIRCAM · F115W F187N F200W F335M F444W F470N<br/>OBSERVED 17 DEC 2025 · PROPOSAL 12491<br/><span class="warn">OBSERVED: REAL JWST IMAGE · DEPTH/PARALLAX: INTERFACE VISUALIZATION</span></div>
+  <div id="hint">touch cube to rotate · flick to spin · pinch cube · background ↑/↓ controls HUD</div>
+</div>
+<section id="observatory" aria-label="Observatory controls"><span class="obsEyebrow">WEBB / OBSERVATION DESK</span><div id="obsTarget"></div><label>IMAGE INSPECTION <input id="skyInspect" type="range" min="1" max="3" value="1" step=".05"><output id="skyMagnification">1.00×</output></label><button id="skySequence" aria-pressed="false">START TARGET TOUR</button><span id="obsSession">VIEW TIME 00:00</span><small>Archival Webb imagery · digital inspection</small></section>
+<div id="controls"><button id="lens" class="active">Lens</button><button id="astro">Astro</button><button id="data">Tabs</button><button id="capture">Capture</button><button id="nextSky">Next observation</button></div>
+<div id="captureOverlay"><div class="captureCard"><img id="captureImg" alt="captured frame"><div class="captureActions"><button id="saveCapture">Save / Share</button><button id="closeCapture">Close</button></div><div class="captureNote">Capture stays in Brain Trust until you choose Save / Share.</div></div></div>
+<script type="module" src="/cosmos/app.mjs?v=20261014-power1"></script>
+<nav id="faceAccess" aria-label="Brain Trust tabs"></nav><div class="deckAxis"><span>Y +</span><i></i><span>ORBITAL FIELD</span></div><script type="module" src="/cosmos/observatory.mjs?v=20261014-power1"></script></body>
+</html>

@@ -1,3 +1,4 @@
+import { providerFetch as fetch } from "../lib/provider-request.js";
 import { toolAwarenessPrompt } from "../lib/braintrust-tools.js";
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
@@ -262,7 +263,7 @@ async function callOpenAICompatible({ key, model, prompt, images = [], baseUrl, 
   });
 
   const data = await readJson(response, provider);
-  return data?.choices?.[0]?.message?.content;
+  return {text:data?.choices?.[0]?.message?.content,model:data?.model||model};
 }
 
 async function callGemini({ key, model, prompt, images = [] }) {
@@ -374,7 +375,7 @@ async function callGemini({ key, model, prompt, images = [] }) {
             attempt,
             chars: text.length
           }));
-          return text;
+          return {text,model:modelName};
         }
 
         if (attempt === 1) {
@@ -386,7 +387,7 @@ async function callGemini({ key, model, prompt, images = [] }) {
           continue;
         }
 
-        if (text) return text;
+        if (text) return {text,model:modelName};
 
         lastError = new Error(
           `Gemini ${modelName} returned an empty/incomplete answer.`
@@ -464,10 +465,10 @@ async function callClaude({ key, model, prompt }) {
   });
 
   const data = await readJson(response, "Claude");
-  return data?.content
+  return {text:data?.content
     ?.filter((item) => item?.type === "text")
     .map((item) => item.text)
-    .join("");
+    .join(""),model:data?.model||model};
 }
 
 export default async function handler(req, res) {
@@ -565,12 +566,14 @@ Kyle's message: ${effectiveChallenge}`;
         return res.status(503).json({ error: "GEMINI_API_KEY is not configured." });
       }
 
-      text = await callGemini({
+      const geminiResult = await callGemini({
         key: process.env.GEMINI_API_KEY,
         model: selectedModel,
         prompt,
         images: selectedImages,
       });
+      text = geminiResult.text;
+      actualModel = geminiResult.model;
     } else if (normalizedProvider === "anthropic") {
       if (!process.env.ANTHROPIC_API_KEY) {
         return res.status(503).json({ error: "ANTHROPIC_API_KEY is not configured." });
@@ -766,6 +769,7 @@ Kyle's message: ${effectiveChallenge}`;
       });
     }
 
+    if (text && typeof text === "object") { actualModel=text.model||actualModel; text=text.text; }
     const guess = cleanGuess(text);
     const latency = Date.now() - startedAt;
 

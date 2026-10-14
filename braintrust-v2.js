@@ -82,8 +82,8 @@ async function brainAsk(provider,nick,userText,images=[]){
  const profile=S.profiles[provider]||profileDefaults;
  const plan=profile.plan||"auto";
  const st=S.providerState?.[provider]?.status||"ready";
- if(plan==="off"||!providerReady[provider]||["out","rate","off"].includes(st))return;
- if(typeof freeLifeCanCall==="function"&&!freeLifeCanCall(provider))return;
+ if(plan==="off")return;
+
  if(S.modes.m&&!S.ops[nick]&&!S.voices[nick])return;
 
  const typing=document.createElement("div");
@@ -125,8 +125,8 @@ ${recent}
 Current Brain Trust task:
 ${userText}`;
  try{
-  const endpoint=FREE_LIFE_PROVIDERS.has(provider)?"/api/free-life":"/api/contestant";
-  const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider,model:profile.model,reasoning:profile.reasoning,challenge:prompt,images,mode:"chat"})});
+  const endpoint="/api/gate?target=contestant";
+  const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider,name:nick,model:profile.model,reasoning:profile.reasoning,challenge:prompt,images,mode:"chat",allSeats:true})});
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);
   let answer=data.guess||data.answer||data.text||data.output||data.response||data.content||data.result||data.reply;
@@ -137,7 +137,8 @@ ${userText}`;
   providerReady[provider]=true;
   S.providerState[provider]=Object.assign({},S.providerState[provider]||{},{status:"ready",reason:data.route||"",model:data.model||profile.model||"",route:data.route||provider,free:Boolean(data.free)});
   if(typeof freeLifeRecord==="function")freeLifeRecord(provider,data);
-  add("message",nick,answer);
+  const attribution=`${data.fallback?"Fallback: ":""}${data.actualProvider||provider} · ${data.model||profile.model||"model unspecified"}`;
+  add("message",nick,`[${attribution}]\n${answer}`);
   if((nick==="PrincessGPT"||nick==="Gemmy")&&S.settings.radioVoices)await radioSpeak(nick,answer);
   render();
   renderProviderStatus();
@@ -145,6 +146,7 @@ ${userText}`;
  }catch(e){
   typing.remove();
   compactError(nick,e.message);
+  notice(`⚠ ${nick}: ${e.message}`,"error");
  }
 }
 
@@ -263,6 +265,7 @@ async function brainRunRelayTool(raw){
 
 send=async function(spokenText=""){
  if(spokenText&&typeof spokenText==="object")spokenText="";
+ if(arenaBusy)return;
  const raw=String(spokenText||input.value).trim();
  if(!raw&&!pendingImages.length)return;
 
@@ -310,7 +313,7 @@ send=async function(spokenText=""){
   const isAvailable=a=>{
    const profile=S.profiles[a.key]||{};
    const state=S.providerState?.[a.key]?.status||"ready";
-   return providerReady[a.key]&&profile.plan!=="off"&&active(a.key)&&!["out","off","rate"].includes(state);
+   return profile.plan!=="off"&&active(a.key)&&!S.banned[S.roster[a.key]?.nick||a.nick];
   };
   const available=addressed?[addressed.meta].filter(isAvailable):AI_META.filter(isAvailable);
   if(!available.length){
