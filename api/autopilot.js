@@ -173,7 +173,7 @@ async function propose(task,requester="Kyle"){
  await gh("/git/refs",{method:"POST",body:JSON.stringify({ref:`refs/tags/${backup}`,sha:baseSha})});
  const verified=await gh(`/git/ref/tags/${backup}`);if(verified.object.sha!==baseSha)throw Error("Backup verification failed — build cancelled");
  await gh("/git/refs",{method:"POST",body:JSON.stringify({ref:`refs/heads/${branch}`,sha:baseSha})});
- const paths=["app.js","index.html","styles.css","package.json","README.md","vercel.json","braintrust-v2.js","adaptive-display.js","voice-unlock.js","gemini-free-max.js","free-life-ui.js","shellter/relay.mjs","api/contestant.js","api/status.js","api/speak.js","api/transcribe.js","api/free-life.js","api/funds.js","api/relay-contestant.js"],source=[];
+ const paths=["app.js","index.html","styles.css","package.json","README.md","docs/BRAIN_TRUST_COSMOS_MASTER_SPEC.md","vercel.json","braintrust-v2.js","adaptive-display.js","voice-unlock.js","gemini-free-max.js","free-life-ui.js","shellter/relay.mjs","api/contestant.js","api/status.js","api/speak.js","api/transcribe.js","api/free-life.js","api/funds.js","api/relay-contestant.js"],source=[];
  for(const p of paths){try{source.push(await file(p,baseSha))}catch(e){if(!String(e.message).includes("404"))throw e}}
  const result=await codex(task,source),changes=Array.isArray(result.files)?result.files:[];
  if(!changes.length)throw Error("CodeSavant proposed no file changes");
