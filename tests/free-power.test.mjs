@@ -34,6 +34,17 @@ test('empty, reasoning-only, truncated and malformed replies retry once on the s
    assert.deepEqual(bodies.map(b=>b.max_tokens),[2048,4096]);
    for(const b of bodies){assert.equal(b.provider.max_price.prompt,0);assert.equal(b.provider.max_price.completion,0);assert.deepEqual(b.reasoning,{enabled:false})}
   }
+  const compatibilityBodies=[];
+  globalThis.fetch=async(url,o)=>{
+   compatibilityBodies.push(JSON.parse(o.body));
+   return compatibilityBodies.length===1
+    ? new Response(JSON.stringify({error:{message:'Unsupported reasoning configuration'}}),{status:400})
+    : new Response(JSON.stringify({choices:[{message:{content:'Four'}}]}));
+  };
+  const compatible=await callFreeBrain({model:'test/real:free',prompt:'2+2?'});
+  assert.equal(compatible.guess,'Four');assert.equal(compatible.attempts,2);
+  assert.deepEqual(compatibilityBodies[0].reasoning,{enabled:false});
+  assert.equal(compatibilityBodies[1].reasoning,undefined);
   let calls=0;
   globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({choices:[{message:{content:null,reasoning:'Not a final answer.'}}]}))};
   await assert.rejects(()=>callFreeBrain({model:'test/real:free',prompt:'test',panel:{}}),/thinking without a final answer/);
