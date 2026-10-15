@@ -35,7 +35,7 @@ they check real dispatch logic and failure handling, not live provider capacity.
 
 Free requests allow 2,048 output tokens, then one retry with up to 4,096,
 respecting the catalog output limit. Optional reasoning is disabled for models
-advertising that parameter. Empty, reasoning-only, truncated and malformed
+advertising that parameter; if the provider rejects that configuration with HTTP 400, the one retry omits the optional parameter. Empty, reasoning-only, truncated and malformed
 results get at most one retry to the same selected model under a 38-second
 inference deadline. Quota and billing errors are not retried. Thinking fields
 are never displayed as final answers. Each retry uses the same zero-price gate
