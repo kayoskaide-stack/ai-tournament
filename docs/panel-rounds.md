@@ -4,7 +4,7 @@ In **FREE AI POWER** mode, a normal question goes to each selected free model
 in a separate request. The first successful model answers; later models see
 the actual answers and either add useful content or explicitly report that
 they reviewed them with nothing further to add. Every response identifies the
-API-returned model. Timeouts, quota failures, and malformed results are shown
+API-returned model. Genuine plain text is accepted as an answer when a model ignores the JSON envelope; it is never inferred to be a review. Broken JSON is retried. Timeouts, quota failures, and persistently malformed results are shown
 as unavailable, never as reviews or agreement.
 
 Click **ANOTHER ANGLE?**, or ask “Does anyone have another angle?” or “Anything
@@ -32,3 +32,11 @@ Validation: `node --test tests/free-power.test.mjs tests/seat-reply.test.mjs
 tests/panel-review.test.mjs tests/panel-flow.test.cjs tests/chat-face.test.cjs
 tests/channel-log.test.cjs`. API responses in these tests are simulated;
 they check real dispatch logic and failure handling, not live provider capacity.
+
+Free requests allow 2,048 output tokens, then one retry with up to 4,096,
+respecting the catalog output limit. Optional reasoning is disabled for models
+advertising that parameter. Empty, reasoning-only, truncated and malformed
+results get at most one retry to the same selected model under a 38-second
+inference deadline. Quota and billing errors are not retried. Thinking fields
+are never displayed as final answers. Each retry uses the same zero-price gate
+and consumes shared free quota; no paid model is substituted.

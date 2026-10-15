@@ -32,6 +32,16 @@ test('panel endpoint performs genuine inference, returns explicit review, and fa
     assert.equal((await request([{model:'other',text:'Four'}])).data.participation,'reviewed');
     assert.equal((await request()).code,502);
     output='not JSON';const bad=await request();assert.equal(bad.data.success,false);assert.equal(bad.data.participation,undefined);
-    assert.equal(calls,4);
+    assert.equal(calls,6);
   } finally {globalThis.fetch=original;if(old===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=old}
+});
+
+test('optional prose compatibility preserves answers without inventing reviews', () => {
+  const prose = 'Hello Kyle, I am here and ready to help.';
+  assert.deepEqual(parsePanelReply(prose,true,{allowPlainText:true}),{participation:'answered',guess:prose});
+  assert.throws(()=>parsePanelReply(prose,true));
+  for (const raw of ['PASS','I agree','Nothing further to add.', '{"participation":"answered","text":"broken', '<think>I need to decide what to say here.</think>']) {
+    assert.throws(()=>parsePanelReply(raw,true,{allowPlainText:true}));
+  }
+  assert.throws(()=>parsePanelReply('{"participation":"reviewed","text":"Agreed."}',false,{allowPlainText:true}));
 });
