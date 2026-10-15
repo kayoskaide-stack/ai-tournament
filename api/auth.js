@@ -1,5 +1,8 @@
+import { identityBridge } from "../lib/identity-bridge.js";
 
 import {
+  readOnboarding,
+  completeOnboarding,
   loginUser,
   loginPasswordless,
   createMagicLinkToken,
@@ -53,8 +56,9 @@ async function sendMagicEmail(to, link) {
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       from, to,
-      subject: "Your Brain Trust sign-in link",
-      html: `<p>Open this private Brain Trust sign-in link:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`
+      subject: "Confirm your email for Kyle’s Brain Trust",
+      text: `Confirm your email: ${link}\nThis link expires in 15 minutes. Guests must then verify their Undernet CService/X account before entering chat. Brain Trust never asks for your X password.`,
+      html: `<html lang="en"><body style="font:16px system-ui;line-height:1.5"><h1>Kyle’s Brain Trust</h1><p>Confirm your email to continue:</p><p><a style="display:inline-block;padding:14px 20px;background:#163a58;color:#fff;border-radius:6px" href="${link.replace(/&/g,"&amp;")}">CONFIRM MY EMAIL</a></p><p>This link expires in 15 minutes. Next, guests must verify their Undernet CService/X account before entering chat. We never ask for your X password.</p></body></html>`
     })
   });
   if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
@@ -62,6 +66,30 @@ async function sendMagicEmail(to, link) {
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const action = String(req.query?.action || "").toLowerCase();
+  if (req.method === "POST" && req.headers?.origin) {
+    try {
+      if (new URL(req.headers.origin).host !== String(req.headers["x-forwarded-host"] || req.headers.host || "")) return res.status(403).json({ error: "Cross-origin request rejected." });
+    } catch { return res.status(403).json({ error: "Cross-origin request rejected." }); }
+  }
+  try {
+  if (["identity-start", "identity-status"].includes(action)) {
+    if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+    const user = readOnboarding(req);
+    if (!user?.emailVerified) return res.status(403).json({ error: "Confirm your email before verifying CService." });
+    const binding = `${user.id}:${user.rev}:${user.flow}`;
+    if (action === "identity-start") {
+      const data = await identityBridge("start", { binding });
+      return res.status(200).json(data);
+    }
+    const proof = await identityBridge("status", { binding, challenge: String(req.body?.challenge || "") });
+    const result = completeOnboarding(user, proof);
+    if (result) {
+      setSessionCookie(res, result.token, result.maxAge);
+      audit("verified_member_admitted", result.user);
+      return res.status(200).json({ ok: true, verified: true });
+    }
+    return res.status(200).json({ ok: true, verified: false, message: "Waiting for a private verification message from your X-authenticated IRC nickname." });
+  }
 
   if (action === "session") {
     if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
@@ -85,7 +113,12 @@ export default async function handler(req, res) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: "Valid email required." });
     if (cservice && !/^[A-Za-z0-9_\-\[\]\\`^{}|]{1,32}$/.test(cservice)) return res.status(400).json({ error: "Invalid CService username format." });
 
-    const token = createMagicLinkToken({ email, nick, cservice });
+    const pending = readOnboarding(req);
+    const invite = pending && !pending.id.startsWith("email:") ? { id: pending.id, rev: pending.rev, flow: pending.flow } : undefined;
+    // Invite holders may confirm their own email without a separate environment allowlist.
+    // Preserve owner email login; guests must present an invite first.
+    const ownerEmail = String(process.env.BRAINTRUST_OWNER_EMAIL || "").trim().toLowerCase();
+    const token = (invite || email === ownerEmail) ? createMagicLinkToken({ email, nick, cservice, invite }) : null;
     if (token) {
       const link = `${publicBaseUrl()}/api/auth?action=verify&token=${encodeURIComponent(token)}`;
       await sendMagicEmail(email, link);
@@ -94,8 +127,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, message: "If that email is authorized, a private sign-in link has been sent." });
   }
   if (action === "verify") {
-    if (req.method !== "GET") return res.status(405).send("GET only");
-    const payload = readMagicLinkToken(req.query?.token);
+    if (!["GET", "POST"].includes(req.method)) return res.status(405).send("GET or POST only");
+    const rawToken = req.method === "POST" ? req.body?.token : req.query?.token;
+    const payload = readMagicLinkToken(rawToken);
+    if (!payload) return res.status(400).send("Invalid, expired, or unauthorized confirmation link. Return to Brain Trust and request a new one.");
+    // Email scanners may follow GET links. Consume only on an explicit form POST.
+    if (req.method === "GET") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
+      return res.status(200).send(`<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Confirm Brain Trust email</title><body style="background:#071019;color:#d9e3ea;font:18px system-ui;padding:24px"><h1>Kyle’s Brain Trust</h1><p>Confirm your email to continue registration.</p><form method="post" action="/api/auth?action=verify"><input type="hidden" name="token" value="${String(rawToken).replace(/[^A-Za-z0-9_.-]/g, "")}"><button style="min-height:48px;padding:12px 24px;font:inherit">CONFIRM MY EMAIL</button></form><p>Guests must then verify their CService/X account before entering chat.</p></body></html>`);
+    }
+    if (payload?.invite) await identityBridge("consume-email", { nonce: payload.nonce, expires: payload.exp });
     const result = payload ? loginPasswordless(payload) : null;
     if (!result) return res.status(400).send("Invalid, expired, or unauthorized Brain Trust sign-in link.");
     setSessionCookie(res, result.token, result.maxAge);
@@ -125,8 +168,12 @@ export default async function handler(req, res) {
     failed.delete(ip);
     setSessionCookie(res, result.token, result.maxAge);
     audit("login_success", result.user, { ip });
-    return res.status(200).json({ ok: true, user: result.user });
+    return res.status(200).json({ ok: true, onboarding: result.onboarding === true, user: result.user });
   } catch (e) {
     return res.status(503).json({ error: e?.message || String(e) });
+  }
+  } catch (e) {
+    console.error("onboarding_unavailable", e?.message);
+    return res.status(503).json({ error: "Registration service unavailable. Chat remains locked; please try again shortly." });
   }
 }

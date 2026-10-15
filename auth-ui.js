@@ -19,11 +19,62 @@ body.bt-role-member .fundMini{display:none!important}`;document.head.appendChild
   function showLogin(message=""){
     document.body.classList.add("bt-auth-pending");document.querySelector("#btAuthGate")?.remove();
     const gate=el("section",{id:"btAuthGate"}),card=el("form",{id:"btAuthCard"});
-    card.innerHTML=`<h1>Kyle's Brain Trust</h1><p>Private room. Use your assigned access code, or an approved email sign-in link.</p><label for="btNick">Nickname</label><input id="btNick" autocomplete="username" autocapitalize="none" spellcheck="false"><label for="btCode">Access code</label><input id="btCode" type="password" autocomplete="current-password"><button type="submit">ENTER #ai-tournament</button><hr style="border:0;border-top:1px solid #23394b;margin:16px 0"><label for="btEmail">Approved email</label><input id="btEmail" type="email" autocomplete="email" autocapitalize="none"><label for="btCService">CService username (optional — username only)</label><input id="btCService" autocomplete="off" autocapitalize="none" spellcheck="false"><button id="btMagic" type="button">EMAIL PRIVATE SIGN-IN LINK</button><div id="btAuthError"></div>`;
+    card.innerHTML=`<h1>Kyle's Brain Trust</h1><p>Private room. Guests must complete: invite code → confirm email → verify CService/X.</p><label for="btNick">Nickname</label><input id="btNick" autocomplete="username" autocapitalize="none" spellcheck="false"><label for="btCode">Access code</label><input id="btCode" type="password" autocomplete="current-password"><button type="submit">CONTINUE WITH INVITE CODE</button><hr style="border:0;border-top:1px solid #23394b;margin:16px 0"><label for="btEmail">Your email</label><input id="btEmail" type="email" autocomplete="email" autocapitalize="none"><button id="btMagic" type="button">CONFIRM EMAIL</button><div id="btAuthError"></div>`;
     gate.appendChild(card);document.body.appendChild(gate);const error=card.querySelector("#btAuthError");error.textContent=message;
-    card.addEventListener("submit",async e=>{e.preventDefault();const button=card.querySelector('button[type="submit"]');error.textContent="";button.disabled=true;button.textContent="CHECKING…";try{const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nick:card.querySelector("#btNick").value,code:card.querySelector("#btCode").value})}),data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);location.reload()}catch(err){error.textContent=err.message||String(err);button.disabled=false;button.textContent="ENTER #ai-tournament"}});
-    card.querySelector("#btMagic").onclick=async()=>{const button=card.querySelector("#btMagic");error.textContent="";button.disabled=true;button.textContent="SENDING…";try{const r=await fetch("/api/auth?action=request-link",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:card.querySelector("#btEmail").value,nick:card.querySelector("#btNick").value,cserviceUsername:card.querySelector("#btCService").value})}),data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);error.style.color="#8de6a8";error.textContent=data.message||"If authorized, a sign-in link was sent."}catch(err){error.style.color="#ff7887";error.textContent=err.message||String(err)}finally{button.disabled=false;button.textContent="EMAIL PRIVATE SIGN-IN LINK"}};
+    card.addEventListener("submit",async e=>{e.preventDefault();const button=card.querySelector('button[type="submit"]');error.textContent="";button.disabled=true;button.textContent="CHECKING…";try{const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nick:card.querySelector("#btNick").value,code:card.querySelector("#btCode").value})}),data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);location.reload()}catch(err){error.textContent=err.message||String(err);button.disabled=false;button.textContent="CONTINUE WITH INVITE CODE"}});
+    card.querySelector("#btMagic").onclick=async()=>{const button=card.querySelector("#btMagic");error.textContent="";button.disabled=true;button.textContent="SENDING…";try{const r=await fetch("/api/auth?action=request-link",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:card.querySelector("#btEmail").value,nick:card.querySelector("#btNick").value})}),data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);error.style.color="#8de6a8";error.textContent=data.message||"If authorized, a sign-in link was sent."}catch(err){error.style.color="#ff7887";error.textContent=err.message||String(err)}finally{button.disabled=false;button.textContent="CONFIRM EMAIL"}};
   }
-  async function boot(){installStyle();document.body.classList.add("bt-auth-pending");try{const r=await fetch("/api/session",{cache:"no-store"}),data=await r.json().catch(()=>({}));if(r.ok&&data.user){await loadApp(data.user);return}showLogin(data.frozen?"Brain Trust is in owner lockdown.":"")}catch(e){showLogin(`Authentication service error: ${e.message||e}`)}}
+  async function showOnboarding(state) {
+    showLogin();
+    const card = document.querySelector("#btAuthCard");
+    const status = card.querySelector("#btAuthError");
+    card.querySelector("h1").textContent = "Finish registration";
+    card.querySelector("p").textContent = state.emailVerified
+      ? "Email confirmed. Verify your CService/X account to unlock chat."
+      : "Invite accepted. Confirm your email first; then verify CService/X.";
+    for (const id of ["btNick", "btCode"]) {
+      const input = card.querySelector("#" + id);
+      card.querySelector(`label[for="${id}"]`).hidden = true;
+      input.hidden = true;
+    }
+    card.querySelector('button[type="submit"]').hidden = true;
+    const restart = el("button", { type: "button" }, "START OVER / DIFFERENT ACCOUNT");
+    restart.onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.reload(); };
+    card.appendChild(restart);
+    if (!state.emailVerified) return;
+    for (const selector of ['label[for="btEmail"]', '#btEmail', '#btMagic']) card.querySelector(selector).hidden = true;
+    const instructions = el("p");
+    instructions.append("1. Register and confirm your account at ");
+    const link = el("a", { href: "https://cservice.undernet.org/", target: "_blank", rel: "noopener" }, "Undernet CService");
+    instructions.append(link, ". 2. Connect to Undernet using an IRC client and log in to X there. 3. Paste the private command below. Your X password stays in your IRC client.");
+    card.insertBefore(instructions, status);
+    const command = el("pre", { style: "white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px" });
+    card.insertBefore(command, status);
+    const check = el("button", { type: "button" }, "CREATE VERIFICATION COMMAND");
+    card.insertBefore(check, status);
+    let challenge = "";
+    check.onclick = async () => {
+      check.disabled = true;
+      try {
+        const action = challenge ? "identity-status" : "identity-start";
+        const response = await fetch("/api/auth?action=" + action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ challenge }) });
+        const data = await response.json();
+        if (!response.ok) throw Error(data.error || "Verification unavailable.");
+        if (data.verified) { location.reload(); return; }
+        if (data.challenge) {
+          challenge = data.challenge;
+          command.textContent = data.command;
+          const copy = el("button", { type: "button" }, "COPY COMMAND");
+          copy.onclick = async () => { try { await navigator.clipboard.writeText(command.textContent); copy.textContent = "COPIED"; } catch { status.textContent = "Select and copy the command above."; } };
+          card.insertBefore(copy, check);
+        }
+        status.textContent = data.message || "Send this private command from your X-authenticated nickname, then check verification.";
+        check.textContent = "CHECK VERIFICATION";
+      } catch (e) { status.textContent = e.message; }
+      finally { check.disabled = false; }
+    };
+  }
+  async function boot(){installStyle();document.body.classList.add("bt-auth-pending");try{const r=await fetch("/api/session",{cache:"no-store"}),data=await r.json().catch(()=>({}));if(r.ok&&data.user){await loadApp(data.user);return}if(data.onboarding){await showOnboarding(data.onboarding);return}showLogin(data.frozen?"Brain Trust is in owner lockdown.":"")}catch(e){showLogin(`Authentication service error: ${e.message||e}`)}}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot()
 })();
+
