@@ -2,3 +2,5 @@
 @media(max-width:700px){.btPowerBar{padding:6px 8px;gap:5px}.btPowerBar button{font-size:8px;padding:6px 8px;min-height:32px}.btPowerBar span{width:100%;margin-left:0;font-size:7px}.btFreeRoster button{font-size:9px}.btModuleHero{background-position:center}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 #send{background:linear-gradient(135deg,#164570,#0b2847)!important;color:#dbf4ff!important;border-color:#8ad6ff66!important}.btProviderCard:nth-child(3n+1){background:linear-gradient(130deg,#07182fe8,#0b1536e8),url('/cosmos/webb-m74.webp') 20% center/cover}.btProviderCard:nth-child(3n+2){background:linear-gradient(130deg,#062428ed,#0b172fe8),url('/cosmos/webb-background.webp') 80% center/cover}.btProviderCard:nth-child(3n){background:linear-gradient(130deg,#141a3eeb,#09182fe8),url('/cosmos/webb-m74.webp') 60% center/cover}
+
+.btPowerBar button:disabled{opacity:.45;cursor:default}.btFreeRoster button small{display:block;margin-top:5px;font-size:7px;line-height:1.6;letter-spacing:.02em;overflow-wrap:anywhere}
