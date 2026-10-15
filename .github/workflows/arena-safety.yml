@@ -22,3 +22,6 @@ jobs:
         run: |
           git diff --check "${{ github.event.pull_request.base.sha }}"...HEAD
           ! git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'
+
+      - name: Verify panel requests, reviews, attribution and logs
+        run: node --test tests/free-power.test.mjs tests/seat-reply.test.mjs tests/panel-review.test.mjs tests/panel-flow.test.cjs tests/chat-face.test.cjs tests/channel-log.test.cjs
