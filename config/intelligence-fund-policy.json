@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "Marginal Intelligence Budget",
+  "purpose": "Use contributed Intelligence Fund money only where paid capacity measurably improves Brain Trust answer quality, reliability, verification or synthesis beyond the zero-price baseline.",
+  "principles": [
+    "Run capable zero-price models first when they are adequate.",
+    "Never pay merely to display more AI names or duplicate an answer.",
+    "Prefer paid calls that correct, verify, add a genuinely different useful angle, or produce a substantially better final synthesis.",
+    "Never silently substitute one provider's output for another provider's identity.",
+    "Show outages, quota limits and unavailable providers rather than hiding them behind fake participation."
+  ],
+  "measures": {
+    "successfulAnswerRate": "completed usable answers divided by attempts",
+    "uniqueContributionRate": "answers judged to add a non-duplicative useful point divided by completed answers",
+    "verificationValue": "corrections, fact checks or risk catches that materially change the final answer",
+    "latency": "time to a usable result",
+    "truncationRetryRate": "calls requiring retry because output was incomplete or unusable",
+    "costPerUsefulContribution": "actual provider cost divided by accepted useful contributions"
+  },
+  "allocation": {
+    "reliabilityReservePercent": 20,
+    "maxSingleProviderPercentBeforeReview": 35,
+    "canaryPercentPerNewPaidRoute": 5,
+    "priorityOrder": [
+      "restore an otherwise unavailable essential seat",
+      "verification or factual challenge when uncertainty is material",
+      "final synthesis quality",
+      "genuinely different reasoning from a provider with proven unique contribution value",
+      "speed improvements when quality is unchanged"
+    ]
+  },
+  "guardrails": {
+    "autoSpendEnabledByDefault": false,
+    "paidFallbackMustBeExplicit": true,
+    "providerIdentityMustBeVerified": true,
+    "spendWithoutMeasuredBenefit": false,
+    "recordActualCostWhenProviderReturnsUsage": true
+  }
+}
