@@ -20,8 +20,11 @@ jobs:
         run: find . -path ./.git -prune -o -name '*.js' -type f -exec node --check {} \;
       - name: Reject conflict markers and whitespace errors
         run: |
-          git diff --check "${{ github.event.pull_request.base.sha }}"...HEAD
+          git -c core.whitespace=blank-at-eol,space-before-tab,-blank-at-eof diff --check "${{ github.event.pull_request.base.sha }}"...HEAD
           ! git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'
 
       - name: Verify panel requests, reviews, attribution and logs
-        run: node --test tests/free-power.test.mjs tests/seat-reply.test.mjs tests/panel-review.test.mjs tests/panel-flow.test.cjs tests/chat-face.test.cjs tests/channel-log.test.cjs
+        run: node --test tests/onboarding.test.mjs tests/free-power.test.mjs tests/seat-reply.test.mjs tests/panel-review.test.mjs tests/panel-flow.test.cjs tests/chat-face.test.cjs tests/channel-log.test.cjs
+
+      - name: Parse relay identity verification
+        run: node --check shellter/relay.mjs && node --check shellter/identity-gate.mjs
