@@ -1,7 +1,7 @@
 (()=>{
   const STORAGE_KEY='BT_PANEL_VIEW';
   const VALID=new Set(['normal','masked','hidden']);
-  let installed=false,round=null,thinking=null;
+  let installed=false,round=null,thinking=null,lastQuestion='';
 
   const mode=()=>{const v=localStorage.getItem(STORAGE_KEY)||'normal';return VALID.has(v)?v:'normal'};
   const setMode=v=>{if(!VALID.has(v))return;localStorage.setItem(STORAGE_KEY,v);document.body.dataset.panelView=v;updateSettingText()};
@@ -63,7 +63,7 @@
   function lastMessageLine(){return document.querySelector('#chat .line.message:last-child')}
 
   function beginRound(label='Panel'){
-    round={active:true,view:mode(),label,question:'',contributions:[],started:Date.now(),synthesizing:false};
+    round={active:true,view:mode(),label,question:lastQuestion,contributions:[],started:Date.now(),synthesizing:false};
     if(round.view==='hidden')startThinking();
   }
 
@@ -118,7 +118,7 @@
 
     window.add=function(type,nick,text,keep=true){
       const str=String(text??'');
-      if(type==='message'&&window.S&&nick===S.nick&&round?.active)round.question=str;
+      if(type==='message'&&typeof S!=='undefined'&&nick===S.nick)lastQuestion=str;
       const hit=type==='message'?str.match(panelReply):null;
       if(!hit)return baseAdd(type,nick,text,keep);
       if(!round?.active)beginRound('Panel');
@@ -147,23 +147,6 @@
       }
       if(round?.active&&round.view!=='normal'&&/(?:No review or agreement recorded|Reviewed|unavailable|rate limit|quota)/i.test(str))return;
       return baseNotice(text,type);
-    };
-
-    // Capture the human question before the panel-start notice resets the round object.
-    const originalAdd=window.add;
-    window.add=function(type,nick,text,keep=true){
-      if(type==='message'&&window.S&&nick===S.nick){
-        const nextQuestion=String(text??'');
-        const value=originalAdd(type,nick,text,keep);
-        if(round?.active&&!round.question)round.question=nextQuestion;
-        window.__btLastPanelQuestion=nextQuestion;
-        return value;
-      }
-      return originalAdd(type,nick,text,keep);
-    };
-    const originalBegin=beginRound;
-    beginRound=function(label='Panel'){
-      originalBegin(label);if(round)round.question=window.__btLastPanelQuestion||'';
     };
 
     window.BrainTrustPanelView={get mode(){return mode()},setMode};
