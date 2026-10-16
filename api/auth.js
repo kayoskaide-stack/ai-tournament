@@ -63,6 +63,33 @@ async function sendMagicEmail(to, link) {
   });
   if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
+
+// Keep only a non-sensitive completion flag in the public registry. Email and
+// CService account names remain out of GitHub. A tracking failure never changes
+// the actual access decision, which is made from the signed session + relay proof.
+async function markRegistrationComplete(user) {
+  if (!user?.id || user.role === "owner" || String(process.env.VERCEL_ENV || "") !== "production") return;
+  const token = String(process.env.ARENA_GITHUB_TOKEN || "");
+  if (!token) return;
+  const api = "https://api.github.com/repos/kayoskaide-stack/ai-tournament";
+  const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const current = await fetch(`${api}/contents/security/users.js?ref=main`, { headers });
+    if (!current.ok) throw Error(`Registration status read failed (${current.status}).`);
+    const file = await current.json();
+    const source = Buffer.from(file.content || "", "base64").toString("utf8");
+    const registry = JSON.parse(source.replace(/^\s*export\s+default\s+/, "").replace(/;\s*$/, ""));
+    const row = (registry.users || []).find(x => String(x.id || "") === String(user.id));
+    if (!row || row.active === false || Number(row.rev || 1) !== Number(user.rev || 1) || row.verified === true) return;
+    row.verified = true;
+    registry.version = Number(registry.version || 1) + 1;
+    const content = Buffer.from(`export default ${JSON.stringify(registry, null, 2)};\n`).toString("base64");
+    const saved = await fetch(`${api}/contents/security/users.js`, { method: "PUT", headers, body: JSON.stringify({ message: `Security: mark ${String(row.nick || "guest").slice(0, 24)} registration verified`, content, sha: file.sha, branch: "main" }) });
+    if (saved.ok) return;
+    if (saved.status !== 409 || attempt) throw Error(`Registration status write failed (${saved.status}).`);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const action = String(req.query?.action || "").toLowerCase();
@@ -86,6 +113,8 @@ export default async function handler(req, res) {
     if (result) {
       setSessionCookie(res, result.token, result.maxAge);
       audit("verified_member_admitted", result.user);
+      try { await markRegistrationComplete(result.user); }
+      catch (e) { console.warn("verification_status_record_failed", e?.message || String(e)); }
       return res.status(200).json({ ok: true, verified: true });
     }
     return res.status(200).json({ ok: true, verified: false, message: "Waiting for a private verification message from your X-authenticated IRC nickname." });
