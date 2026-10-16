@@ -7,6 +7,9 @@ export default async function handler(req,res){
   if(scope==="users")
     return usersHandler(req,res);
 
+  if(scope==="irc-users")
+    return usersHandler(req,res,{allowRelay:true});
+
   if(scope==="security")
     return securityHandler(req,res);
 
