@@ -24,7 +24,7 @@ test('free power rejects model identity drift and marks accepted identity',()=>{
   assert.match(src,/mode === 'synthesis'|mode === "synthesis"/);
 });
 
-test('masked and hidden views retain the real message before changing display',()=>{
+test('masked and hidden views retain the real message before changing display and provide reader view',()=>{
   const src=read('panel-view-modes.js');
   assert.match(src,/Full Debate/);
   assert.match(src,/MASKED/);
@@ -32,6 +32,8 @@ test('masked and hidden views retain the real message before changing display',(
   assert.match(src,/baseAdd\(type,nick,text,keep\)/);
   assert.match(src,/line\.hidden=true/);
   assert.match(src,/mode:'synthesis'/);
+  assert.match(src,/OPEN CLEAN READER VIEW/);
+  assert.match(src,/btReaderCard/);
 });
 
 test('Mission Control includes health budget audit deploy transcript and support surfaces',()=>{
@@ -43,12 +45,16 @@ test('Mission Control includes health budget audit deploy transcript and support
   assert.match(index,/braintrust-experience\.js/);
 });
 
-test('Intelligence Fund is transparent and never enables automatic spending by default',()=>{
+test('Intelligence Fund is transparent, value-ranked and never enables automatic spending by default',()=>{
   const p=JSON.parse(read('config/intelligence-fund-policy.json'));
   assert.equal(p.guardrails.autoSpendEnabledByDefault,false);
   assert.equal(p.guardrails.providerIdentityMustBeVerified,true);
+  assert.equal(p.guardrails.donorInfluenceOnAnswers,false);
   assert.ok(p.measures.costPerUsefulContribution);
+  assert.ok(p.measures.costPerSuccessfulRound);
   assert.ok(p.allocation.reliabilityReservePercent>0);
+  assert.match(p.routingStrategy.stopRule,/Stop buying additional opinions/i);
+  assert.ok(p.efficiencyTactics.length>=5);
   const status=read('api/status.js');
   assert.match(status,/BRAINTRUST_DONATE_URL/);
   assert.match(status,/BRAINTRUST_INTELLIGENCE_FUND_URL/);
