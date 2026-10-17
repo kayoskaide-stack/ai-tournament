@@ -1,1 +1,0 @@
-Candidate implementation is ready to be opened as a pull request for automated validation.
