@@ -1,52 +1,124 @@
 {
-  "version": 2,
+  "version": 3,
   "name": "Marginal Intelligence Budget",
   "reviewedAt": "2026-10-16",
-  "purpose": "Use contributed Intelligence Fund money only where paid capacity measurably improves Brain Trust answer quality, reliability, verification or synthesis beyond the zero-price baseline.",
+  "purpose": "Use contributed Intelligence Fund money only where paid capacity measurably improves Brain Trust answer quality, reliability, verification or synthesis beyond the zero-price/local baseline.",
+  "budgetThesis": "The first dollars are a proof-of-value budget, not an excuse to make every seat speak. Brain Trust must earn its extra latency and cost by producing a final answer that is materially better than the strongest practical single-model baseline.",
   "principles": [
-    "Run capable zero-price or local models first when they are adequate.",
-    "Never pay merely to display more AI names or duplicate an answer.",
-    "Prefer paid calls that correct, verify, add a genuinely different useful angle, or produce a substantially better final synthesis.",
+    "Run capable zero-price or low-cost models first when they are adequate.",
+    "Never pay merely to display more AI names, manufacture a debate, or duplicate an answer.",
+    "Prefer independent model families over many correlated variants of the same family.",
+    "Have agents form initial views independently before they see other agents' answers whenever possible.",
+    "Prefer paid calls that correct, verify, add a genuinely different useful angle, use a needed tool, or produce a substantially better final synthesis.",
     "Never silently substitute one provider's output for another provider's identity.",
     "Show outages, quota limits and unavailable providers rather than hiding them behind fake participation.",
-    "Re-check current provider pricing before changing paid routing because model prices and promotions change."
+    "Treat truncation, broken formatting and avoidable provider errors as product defects, not reasons to buy more inference.",
+    "Re-check current provider pricing, model availability and measured quality before changing paid routing because the market changes quickly."
   ],
+  "bootstrapProofOfValue": {
+    "conservativeFloorUsd": 15,
+    "likelyPoolReferenceUsd": 30,
+    "strategy": "Design as if only the conservative floor will ever exist. Do not rely on future donations.",
+    "currentInitialRailRecommendation": {
+      "rail": "OpenRouter paid credits",
+      "reason": "A single funded gateway can reach many distinct model families while avoiding stranded minimum balances across numerous direct providers. It also provides provider-level failover for many exact requested models. Keep direct provider keys as optional redundancy; fund them later only when telemetry proves a direct route adds value.",
+      "cashCeilingRule": "Never exceed the actual contributed cash balance. Account for platform fees and applicable tax before choosing the credit-purchase amount.",
+      "reviewBeforePurchase": true
+    },
+    "reservePercent": 20,
+    "proofWindowQuestions": 20,
+    "proofRequirement": "Before increasing spend, compare Brain Trust final answers against a strong single-model baseline on representative real questions using blind preference plus factuality, completeness, truncation, readability, latency and cost. If Brain Trust is not clearly better, fix orchestration before adding money."
+  },
+  "operatingModes": {
+    "standard": {
+      "targetMaxCostUsdPerRound": 0.01,
+      "initialIndependentAgents": 3,
+      "maxAgents": 3,
+      "maxDebateRounds": 1,
+      "premiumJudge": "only on detected material disagreement or failure"
+    },
+    "smart": {
+      "targetMaxCostUsdPerRound": 0.05,
+      "initialIndependentAgents": 3,
+      "maxAgents": 5,
+      "maxDebateRounds": 2,
+      "premiumJudge": "conditional",
+      "grounding": "when the question is current, factual, document-dependent or otherwise benefits from external evidence"
+    },
+    "deepCouncil": {
+      "label": "Deep Council",
+      "purpose": "Showcase / difficult-question mode designed to demonstrate a visibly better result than a normal single-model answer.",
+      "targetMaxCostUsdPerRound": 0.10,
+      "initialIndependentAgents": 3,
+      "maxAgents": 5,
+      "maxDebateRounds": 2,
+      "premiumJudge": "yes, after independent contributions and targeted challenge",
+      "grounding": "use when materially helpful",
+      "presentation": "polished Reader View with paragraphs, headings and sources or supporting material when useful; never intentionally clip to IRC-sized output"
+    },
+    "absolutePerQuestionHardCapUsd": 0.25,
+    "hardCapOverride": "owner only"
+  },
   "routingStrategy": {
-    "tier0": "Free/local first: answer, classify the problem, and identify whether another model is likely to add value.",
-    "tier1": "Micro-checker: use a low-cost model for a short independent correction, missing-angle or factual-risk pass instead of asking it to rewrite the entire answer.",
-    "tier2": "Specialist: spend on a model whose capability matches the task only when the baseline has a gap, material disagreement, tool need, or repeated failure.",
-    "tier3": "Premium judge: one strong model adjudicates unresolved disagreements or performs the final synthesis; do not call every premium model by default.",
-    "stopRule": "Stop buying additional opinions when the estimated probability of a useful new contribution multiplied by its value is lower than the expected call cost or when two consecutive independent checks add no material information."
+    "tier0": "Classify the question, establish freshness/tool needs, and choose a deliberately diverse panel rather than waking every configured seat.",
+    "tier1": "Three independent low-cost model-family answers. They should not copy or react to each other yet.",
+    "tier2": "Targeted cross-examination: ask only the model(s) most likely to correct a material disagreement, missing angle or factual risk. Do not request another full essay by default.",
+    "tier3": "Evidence/tools: retrieve current sources, documents, images or calculations only when they can change or substantiate the answer.",
+    "tier4": "One strong adjudicator/synthesizer receives the compact claims, disagreements and evidence and produces the user-facing final answer.",
+    "stopRule": "Stop buying additional opinions when two consecutive independent checks add no material information, when the panel is stable, when the expected value of another call is below its cost, or after two debate rounds unless the owner explicitly overrides."
   },
   "efficiencyTactics": [
     "Send expensive models a compact claim-and-disagreement summary instead of the entire raw transcript whenever full context is unnecessary.",
     "Cap checker outputs tightly; verification normally needs a delta, not another essay.",
+    "Use the cheapest capable model for routing, extraction, deduplication and formatting; reserve stronger models for hard reasoning and adjudication.",
     "Cache identical or near-identical verification work when the underlying facts and freshness requirements have not changed.",
-    "Use task-aware routing: cheap fast models for classification and sanity checks, stronger models for hard synthesis and adjudication.",
     "Prefer providers with proven low truncation and retry rates even when their nominal token price is slightly higher.",
     "Benchmark a new paid route with a small canary budget before granting it a larger share.",
-    "For non-urgent work, use discounted batch or off-peak capacity when a provider offers it and the user has opted into economy mode."
+    "For non-urgent work, use discounted batch or off-peak capacity when a provider offers it and the user has opted into economy mode.",
+    "Measure semantic overlap so a model that merely repeats an existing point does not earn another paid turn.",
+    "Prefer diversity by model family and evidence source over sheer seat count."
   ],
+  "valueTriggers": {
+    "spendMoreWhen": [
+      "independent models materially disagree",
+      "a current or factual claim needs grounding",
+      "a specialist capability is needed",
+      "the best baseline answer is incomplete or low-confidence",
+      "a premium synthesis is likely to improve clarity, correctness or actionability",
+      "a previous route failed or truncated and a measured alternate route is more reliable"
+    ],
+    "doNotSpendMoreWhen": [
+      "additional agents are paraphrasing the same answer",
+      "the question is simple and the baseline answer is already complete",
+      "a seat is offline because of a code/configuration defect that money cannot repair",
+      "the only purpose is to make the room look busier",
+      "the reserve floor would be breached without owner approval"
+    ]
+  },
   "measures": {
     "successfulAnswerRate": "completed usable answers divided by attempts",
+    "singleModelWinRate": "blind comparisons won by Brain Trust final answers against the selected strong single-model baseline",
     "uniqueContributionRate": "answers judged to add a non-duplicative useful point divided by completed answers",
     "verificationValue": "corrections, fact checks or risk catches that materially change the final answer",
     "disagreementResolutionRate": "material model disagreements resolved with a supported conclusion divided by disagreements escalated",
+    "semanticDuplicationRate": "paid contributions that substantially repeat an existing contribution divided by paid contributions",
     "latency": "time to a usable result",
     "truncationRetryRate": "calls requiring retry because output was incomplete or unusable",
     "costPerUsefulContribution": "actual provider cost divided by accepted useful contributions",
-    "costPerSuccessfulRound": "total paid cost divided by rounds that produce a materially improved final answer"
+    "costPerSuccessfulRound": "total paid cost divided by rounds that produce a materially improved final answer",
+    "fundRunway": "remaining fund balance divided by rolling average paid cost per successful enhanced round"
   },
   "allocation": {
     "reliabilityReservePercent": 20,
-    "maxSingleProviderPercentBeforeReview": 35,
+    "maxSingleModelFamilyPercentBeforeReview": 35,
     "canaryPercentPerNewPaidRoute": 5,
     "priorityOrder": [
+      "make the core ask-a-question flow reliable and non-truncating",
+      "verification or factual grounding when uncertainty is material",
+      "resolve meaningful disagreement between independent model families",
+      "final synthesis quality and readable presentation",
       "restore an otherwise unavailable essential capability",
-      "verification or factual challenge when uncertainty is material",
-      "resolve meaningful disagreement between independent models",
-      "final synthesis quality",
-      "genuinely different reasoning from a provider with proven unique contribution value",
+      "genuinely different reasoning from a route with proven unique contribution value",
       "speed improvements when quality is unchanged"
     ]
   },
@@ -57,6 +129,8 @@
     "spendWithoutMeasuredBenefit": false,
     "recordActualCostWhenProviderReturnsUsage": true,
     "donorInfluenceOnAnswers": false,
-    "donorPriorityAccessByDefault": false
+    "donorPriorityAccessByDefault": false,
+    "futureDonationsAssumed": false,
+    "unavailableSeatCountsAsParticipation": false
   }
 }
