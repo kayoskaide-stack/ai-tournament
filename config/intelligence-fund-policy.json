@@ -1,29 +1,50 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Marginal Intelligence Budget",
+  "reviewedAt": "2026-10-16",
   "purpose": "Use contributed Intelligence Fund money only where paid capacity measurably improves Brain Trust answer quality, reliability, verification or synthesis beyond the zero-price baseline.",
   "principles": [
-    "Run capable zero-price models first when they are adequate.",
+    "Run capable zero-price or local models first when they are adequate.",
     "Never pay merely to display more AI names or duplicate an answer.",
     "Prefer paid calls that correct, verify, add a genuinely different useful angle, or produce a substantially better final synthesis.",
     "Never silently substitute one provider's output for another provider's identity.",
-    "Show outages, quota limits and unavailable providers rather than hiding them behind fake participation."
+    "Show outages, quota limits and unavailable providers rather than hiding them behind fake participation.",
+    "Re-check current provider pricing before changing paid routing because model prices and promotions change."
+  ],
+  "routingStrategy": {
+    "tier0": "Free/local first: answer, classify the problem, and identify whether another model is likely to add value.",
+    "tier1": "Micro-checker: use a low-cost model for a short independent correction, missing-angle or factual-risk pass instead of asking it to rewrite the entire answer.",
+    "tier2": "Specialist: spend on a model whose capability matches the task only when the baseline has a gap, material disagreement, tool need, or repeated failure.",
+    "tier3": "Premium judge: one strong model adjudicates unresolved disagreements or performs the final synthesis; do not call every premium model by default.",
+    "stopRule": "Stop buying additional opinions when the estimated probability of a useful new contribution multiplied by its value is lower than the expected call cost or when two consecutive independent checks add no material information."
+  },
+  "efficiencyTactics": [
+    "Send expensive models a compact claim-and-disagreement summary instead of the entire raw transcript whenever full context is unnecessary.",
+    "Cap checker outputs tightly; verification normally needs a delta, not another essay.",
+    "Cache identical or near-identical verification work when the underlying facts and freshness requirements have not changed.",
+    "Use task-aware routing: cheap fast models for classification and sanity checks, stronger models for hard synthesis and adjudication.",
+    "Prefer providers with proven low truncation and retry rates even when their nominal token price is slightly higher.",
+    "Benchmark a new paid route with a small canary budget before granting it a larger share.",
+    "For non-urgent work, use discounted batch or off-peak capacity when a provider offers it and the user has opted into economy mode."
   ],
   "measures": {
     "successfulAnswerRate": "completed usable answers divided by attempts",
     "uniqueContributionRate": "answers judged to add a non-duplicative useful point divided by completed answers",
     "verificationValue": "corrections, fact checks or risk catches that materially change the final answer",
+    "disagreementResolutionRate": "material model disagreements resolved with a supported conclusion divided by disagreements escalated",
     "latency": "time to a usable result",
     "truncationRetryRate": "calls requiring retry because output was incomplete or unusable",
-    "costPerUsefulContribution": "actual provider cost divided by accepted useful contributions"
+    "costPerUsefulContribution": "actual provider cost divided by accepted useful contributions",
+    "costPerSuccessfulRound": "total paid cost divided by rounds that produce a materially improved final answer"
   },
   "allocation": {
     "reliabilityReservePercent": 20,
     "maxSingleProviderPercentBeforeReview": 35,
     "canaryPercentPerNewPaidRoute": 5,
     "priorityOrder": [
-      "restore an otherwise unavailable essential seat",
+      "restore an otherwise unavailable essential capability",
       "verification or factual challenge when uncertainty is material",
+      "resolve meaningful disagreement between independent models",
       "final synthesis quality",
       "genuinely different reasoning from a provider with proven unique contribution value",
       "speed improvements when quality is unchanged"
@@ -34,6 +55,8 @@
     "paidFallbackMustBeExplicit": true,
     "providerIdentityMustBeVerified": true,
     "spendWithoutMeasuredBenefit": false,
-    "recordActualCostWhenProviderReturnsUsage": true
+    "recordActualCostWhenProviderReturnsUsage": true,
+    "donorInfluenceOnAnswers": false,
+    "donorPriorityAccessByDefault": false
   }
 }
