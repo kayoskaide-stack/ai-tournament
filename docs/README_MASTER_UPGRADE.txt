@@ -1,0 +1,1 @@
+See MASTER_UPGRADE_2026-10-16.md, INTELLIGENCE_FUND.md, PAYMENT_SETUP.md, and PR_NOTES_MASTER_UPGRADE.md for this candidate release.
